@@ -14,6 +14,7 @@
 
 #include "behavior_path_planner/scene_module/start_planner/start_planner_module.hpp"
 
+#include "behavior_path_planner/marker_utils/colors.hpp"
 #include "behavior_path_planner/utils/create_vehicle_footprint.hpp"
 #include "behavior_path_planner/utils/path_safety_checker/objects_filtering.hpp"
 #include "behavior_path_planner/utils/path_utils.hpp"
@@ -1201,6 +1202,27 @@ void StartPlannerModule::setDebugData() const
     marker.lifetime = life_time;
     planner_type_marker_array.markers.push_back(marker);
     add(planner_type_marker_array);
+  }
+  // Visualize reason when engage is not allowed
+  {
+    visualization_msgs::msg::MarkerArray engage_is_blocked{};
+    const auto color = marker_utils::colors::red();
+    auto marker = createDefaultMarker(
+      header.frame_id, header.stamp, "engage_block_reason", 0,
+      visualization_msgs::msg::Marker::TEXT_VIEW_FACING, createMarkerScale(0.0, 0.0, 1.0), color);
+    marker.pose = status_.pull_out_start_pose;
+
+    if (!status_.is_safe_static_objects) {
+      marker.text = "Cannot engage because no avoidable path against static objects is found.";
+      marker.lifetime = life_time;
+      engage_is_blocked.markers.push_back(marker);
+      add(engage_is_blocked);
+    } else if (!status_.is_safe_dynamic_objects) {
+      marker.text = "Cannot engage because a collision with dynamic objects is detected.";
+      marker.lifetime = life_time;
+      engage_is_blocked.markers.push_back(marker);
+      add(engage_is_blocked);
+    }
   }
 }
 }  // namespace behavior_path_planner
