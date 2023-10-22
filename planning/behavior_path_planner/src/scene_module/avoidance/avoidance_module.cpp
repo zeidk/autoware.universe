@@ -52,17 +52,12 @@
 namespace behavior_path_planner
 {
 
-using behavior_path_planner::utils::path_safety_checker::CollisionCheckDebug;
 using motion_utils::calcLongitudinalOffsetPose;
 using motion_utils::calcSignedArcLength;
 using motion_utils::findNearestIndex;
-using motion_utils::findNearestSegmentIndex;
 using tier4_autoware_utils::appendMarkerArray;
 using tier4_autoware_utils::calcDistance2d;
-using tier4_autoware_utils::calcInterpolatedPose;
 using tier4_autoware_utils::calcLateralDeviation;
-using tier4_autoware_utils::calcLongitudinalDeviation;
-using tier4_autoware_utils::calcYawDeviation;
 using tier4_autoware_utils::getPoint;
 using tier4_autoware_utils::getPose;
 using tier4_autoware_utils::toHexString;
@@ -322,11 +317,12 @@ void AvoidanceModule::fillAvoidanceTargetObjects(
                           getCurrentStatus() == ModuleStatus::WAITING_APPROVAL;
 
   // Separate dynamic objects based on whether they are inside or outside of the expanded lanelets.
+  const auto sparse_resample_path = utils::resamplePathWithSpline(
+    helper_.getPreviousSplineShiftPath().path, parameters_->resample_interval_for_output);
   const auto [object_within_target_lane, object_outside_target_lane] =
     utils::avoidance::separateObjectsByPath(
-      utils::resamplePathWithSpline(
-        helper_.getPreviousSplineShiftPath().path, parameters_->resample_interval_for_output),
-      planner_data_, data, parameters_, is_running, debug);
+      sparse_resample_path, planner_data_, data, parameters_, helper_.getForwardDetectionRange(),
+      is_running, debug);
 
   for (const auto & object : object_outside_target_lane.objects) {
     ObjectData other_object;

@@ -151,16 +151,17 @@ protected:
     CollisionCheckDebugMap & debug_data) const;
 
   LaneChangeTargetObjectIndices filterObject(
-    const lanelet::ConstLanelets & current_lanes, const lanelet::ConstLanelets & target_lanes,
+    const PredictedObjects & objects, const lanelet::ConstLanelets & current_lanes,
+    const lanelet::ConstLanelets & target_lanes,
     const lanelet::ConstLanelets & target_backward_lanes) const;
 
   //! @brief Check if the ego vehicle is in stuck by a stationary obstacle.
   //! @param obstacle_check_distance Distance to check ahead for any objects that might be
   //! obstructing ego path. It makes sense to use values like the maximum lane change distance.
-  bool isVehicleStuckByObstacle(
+  bool isVehicleStuck(
     const lanelet::ConstLanelets & current_lanes, const double obstacle_check_distance) const;
 
-  bool isVehicleStuckByObstacle(const lanelet::ConstLanelets & current_lanes) const;
+  bool isVehicleStuck(const lanelet::ConstLanelets & current_lanes) const;
 
   double calcMaximumLaneChangeLength(
     const lanelet::ConstLanelet & current_terminal_lanelet, const double max_acc) const;
@@ -173,7 +174,6 @@ protected:
 
   double getStopTime() const { return stop_time_; }
 
-  rclcpp::Logger logger_ = rclcpp::get_logger("lane_change").get_child(getModuleTypeStr());
   double stop_time_{0.0};
 };
 }  // namespace behavior_path_planner

@@ -21,7 +21,6 @@
 
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace behavior_path_planner
@@ -329,10 +328,6 @@ AvoidanceByLaneChangeModuleManager::AvoidanceByLaneChangeModuleManager(
       *node, ns + "object_ignore_section_crosswalk_in_front_distance");
     p.object_ignore_section_crosswalk_behind_distance =
       getOrDeclareParameter<double>(*node, ns + "object_ignore_section_crosswalk_behind_distance");
-    p.object_check_forward_distance =
-      getOrDeclareParameter<double>(*node, ns + "object_check_forward_distance");
-    p.object_check_backward_distance =
-      getOrDeclareParameter<double>(*node, ns + "object_check_backward_distance");
     p.object_check_goal_distance =
       getOrDeclareParameter<double>(*node, ns + "object_check_goal_distance");
     p.threshold_distance_object_is_on_center =
@@ -343,6 +338,17 @@ AvoidanceByLaneChangeModuleManager::AvoidanceByLaneChangeModuleManager(
       getOrDeclareParameter<double>(*node, ns + "object_check_min_road_shoulder_width");
     p.object_last_seen_threshold =
       getOrDeclareParameter<double>(*node, ns + "object_last_seen_threshold");
+  }
+
+  {
+    std::string ns = "avoidance.target_filtering.detection_area.";
+    p.use_static_detection_area = getOrDeclareParameter<bool>(*node, ns + "static");
+    p.object_check_min_forward_distance =
+      getOrDeclareParameter<double>(*node, ns + "min_forward_distance");
+    p.object_check_max_forward_distance =
+      getOrDeclareParameter<double>(*node, ns + "max_forward_distance");
+    p.object_check_backward_distance =
+      getOrDeclareParameter<double>(*node, ns + "backward_distance");
   }
 
   // safety check
