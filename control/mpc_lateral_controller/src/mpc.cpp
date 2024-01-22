@@ -568,9 +568,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   addSteerWeightF(prediction_dt, f);
 
   MatrixXd A = MatrixXd::Identity(DIM_U_N, DIM_U_N);
-  for (int i = 1; i < DIM_U_N; i++) {
-    A(i, i - 1) = -1.0;
-  }
+  A.bottomLeftCorner(DIM_U_N - 1, DIM_U_N - 1) = -MatrixXd::Identity(DIM_U_N - 1, DIM_U_N - 1);
 
   // steering angle limit
   VectorXd lb = VectorXd::Constant(DIM_U_N, -m_steer_lim);  // min steering angle
