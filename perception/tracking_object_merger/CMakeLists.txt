@@ -6,8 +6,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(autoware_cmake REQUIRED)
+find_package(glog REQUIRED)
 autoware_package()
-find_package(nlohmann_json REQUIRED) # for debug
 
 
 # find dependencies
@@ -22,21 +22,17 @@ include_directories(
     ${EIGEN3_INCLUDE_DIR}
 )
 
-ament_auto_add_library(mu_successive_shortest_path SHARED
-  src/data_association/mu_successive_shortest_path/mu_successive_shortest_path_wrapper.cpp
-)
-
 ament_auto_add_library(decorative_tracker_merger_node SHARED
   src/data_association/data_association.cpp
+  src/data_association/mu_successive_shortest_path/mu_successive_shortest_path_wrapper.cpp
   src/decorative_tracker_merger.cpp
   src/utils/utils.cpp
   src/utils/tracker_state.cpp
 )
 
 target_link_libraries(decorative_tracker_merger_node
-  mu_successive_shortest_path
   Eigen3::Eigen
-  nlohmann_json::nlohmann_json # for debug
+  glog::glog
 )
 
 rclcpp_components_register_node(decorative_tracker_merger_node

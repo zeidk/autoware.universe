@@ -31,8 +31,7 @@ using tier4_autoware_utils::getOrDeclareParameter;
 
 CrosswalkModuleManager::CrosswalkModuleManager(rclcpp::Node & node)
 : SceneModuleManagerInterfaceWithRTC(
-    node, getModuleName(),
-    getOrDeclareParameter<bool>(node, std::string(getModuleName()) + ".common.enable_rtc"))
+    node, getModuleName(), getEnableRTC(node, std::string(getModuleName()) + ".common.enable_rtc"))
 {
   const std::string ns(getModuleName());
 
@@ -63,12 +62,14 @@ CrosswalkModuleManager::CrosswalkModuleManager(rclcpp::Node & node)
   cp.no_relax_velocity = getOrDeclareParameter<double>(node, ns + ".slow_down.no_relax_velocity");
 
   // param for stuck vehicle
+  cp.enable_stuck_check_in_intersection =
+    getOrDeclareParameter<bool>(node, ns + ".stuck_vehicle.enable_stuck_check_in_intersection");
   cp.stuck_vehicle_velocity =
     getOrDeclareParameter<double>(node, ns + ".stuck_vehicle.stuck_vehicle_velocity");
   cp.max_stuck_vehicle_lateral_offset =
     getOrDeclareParameter<double>(node, ns + ".stuck_vehicle.max_stuck_vehicle_lateral_offset");
-  cp.stuck_vehicle_attention_range =
-    getOrDeclareParameter<double>(node, ns + ".stuck_vehicle.stuck_vehicle_attention_range");
+  cp.required_clearance =
+    getOrDeclareParameter<double>(node, ns + ".stuck_vehicle.required_clearance");
   cp.min_acc_for_stuck_vehicle = getOrDeclareParameter<double>(node, ns + ".stuck_vehicle.min_acc");
   cp.max_jerk_for_stuck_vehicle =
     getOrDeclareParameter<double>(node, ns + ".stuck_vehicle.max_jerk");
@@ -114,6 +115,8 @@ CrosswalkModuleManager::CrosswalkModuleManager(rclcpp::Node & node)
   // param for target area & object
   cp.crosswalk_attention_range =
     getOrDeclareParameter<double>(node, ns + ".object_filtering.crosswalk_attention_range");
+  cp.vehicle_object_cross_angle_threshold = getOrDeclareParameter<double>(
+    node, ns + ".object_filtering.vehicle_object_cross_angle_threshold");
   cp.look_unknown =
     getOrDeclareParameter<bool>(node, ns + ".object_filtering.target_object.unknown");
   cp.look_bicycle =
@@ -128,8 +131,10 @@ void CrosswalkModuleManager::launchNewModules(const PathWithLaneId & path)
 {
   const auto rh = planner_data_->route_handler_;
 
-  const auto launch = [this, &path](const auto id, const auto & use_regulatory_element) {
-    if (isModuleRegistered(id)) {
+  const auto launch = [this, &path](
+                        const auto road_lanelet_id, const auto crosswalk_lanelet_id,
+                        const std::optional<int64_t> & reg_elem_id) {
+    if (isModuleRegistered(crosswalk_lanelet_id)) {
       return;
     }
 
@@ -137,24 +142,30 @@ void CrosswalkModuleManager::launchNewModules(const PathWithLaneId & path)
     const auto logger = logger_.get_child("crosswalk_module");
     const auto lanelet_map_ptr = planner_data_->route_handler_->getLaneletMapPtr();
 
+    // NOTE: module_id is always a lane id so that isModuleRegistered works correctly in the case
+    //       where both regulatory element and non-regulatory element crosswalks exist.
     registerModule(std::make_shared<CrosswalkModule>(
-      node_, id, lanelet_map_ptr, p, use_regulatory_element, logger, clock_));
-    generateUUID(id);
-    updateRTCStatus(getUUID(id), true, std::numeric_limits<double>::lowest(), path.header.stamp);
+      node_, road_lanelet_id, crosswalk_lanelet_id, reg_elem_id, lanelet_map_ptr, p, logger,
+      clock_));
+    generateUUID(crosswalk_lanelet_id);
+    updateRTCStatus(
+      getUUID(crosswalk_lanelet_id), true, std::numeric_limits<double>::lowest(),
+      path.header.stamp);
   };
 
-  const auto crosswalk_leg_elem_map = planning_utils::getRegElemMapOnPath<Crosswalk>(
+  const auto crosswalk_reg_elem_map = planning_utils::getRegElemMapOnPath<Crosswalk>(
     path, rh->getLaneletMapPtr(), planner_data_->current_odometry->pose);
 
-  for (const auto & crosswalk : crosswalk_leg_elem_map) {
-    launch(crosswalk.first->id(), true);
+  for (const auto & crosswalk : crosswalk_reg_elem_map) {
+    // NOTE: The former id is a lane id, and the latter one is a regulatory element's id.
+    launch(crosswalk.second.id(), crosswalk.first->crosswalkLanelet().id(), crosswalk.first->id());
   }
 
   const auto crosswalk_lanelets = getCrosswalksOnPath(
     planner_data_->current_odometry->pose, path, rh->getLaneletMapPtr(), rh->getOverallGraphPtr());
 
   for (const auto & crosswalk : crosswalk_lanelets) {
-    launch(crosswalk.id(), false);
+    launch(crosswalk.first, crosswalk.second.id(), std::nullopt);
   }
 }
 
@@ -168,11 +179,11 @@ CrosswalkModuleManager::getModuleExpiredFunction(const PathWithLaneId & path)
   crosswalk_id_set = getCrosswalkIdSetOnPath(
     planner_data_->current_odometry->pose, path, rh->getLaneletMapPtr(), rh->getOverallGraphPtr());
 
-  const auto crosswalk_leg_elem_map = planning_utils::getRegElemMapOnPath<Crosswalk>(
+  const auto crosswalk_reg_elem_map = planning_utils::getRegElemMapOnPath<Crosswalk>(
     path, rh->getLaneletMapPtr(), planner_data_->current_odometry->pose);
 
-  for (const auto & crosswalk : crosswalk_leg_elem_map) {
-    crosswalk_id_set.insert(crosswalk.first->id());
+  for (const auto & crosswalk : crosswalk_reg_elem_map) {
+    crosswalk_id_set.insert(crosswalk.first->crosswalkLanelet().id());
   }
 
   return [crosswalk_id_set](const std::shared_ptr<SceneModuleInterface> & scene_module) {

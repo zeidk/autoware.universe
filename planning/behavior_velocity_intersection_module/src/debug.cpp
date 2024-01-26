@@ -90,7 +90,7 @@ visualization_msgs::msg::MarkerArray createPoseMarkerArray(
   marker_line.type = visualization_msgs::msg::Marker::LINE_STRIP;
   marker_line.action = visualization_msgs::msg::Marker::ADD;
   marker_line.pose.orientation = createMarkerOrientation(0, 0, 0, 1.0);
-  marker_line.scale = createMarkerScale(0.1, 0.0, 0.0);
+  marker_line.scale = createMarkerScale(0.2, 0.0, 0.0);
   marker_line.color = createMarkerColor(r, g, b, 0.999);
 
   const double yaw = tf2::getYaw(pose.orientation);
@@ -188,12 +188,36 @@ visualization_msgs::msg::MarkerArray IntersectionModule::createDebugMarkerArray(
       &debug_marker_array);
   }
 
+  if (debug_data_.first_attention_area) {
+    appendMarkerArray(
+      createLaneletPolygonsMarkerArray(
+        {debug_data_.first_attention_area.value()}, "first_attention_area", lane_id_, 1, 0.647,
+        0.0),
+      &debug_marker_array, now);
+  }
+
+  if (debug_data_.second_attention_area) {
+    appendMarkerArray(
+      createLaneletPolygonsMarkerArray(
+        {debug_data_.second_attention_area.value()}, "second_attention_area", lane_id_, 1, 0.647,
+        0.0),
+      &debug_marker_array, now);
+  }
+
   if (debug_data_.stuck_vehicle_detect_area) {
     appendMarkerArray(
       debug::createPolygonMarkerArray(
         debug_data_.stuck_vehicle_detect_area.value(), "stuck_vehicle_detect_area", lane_id_, now,
         0.3, 0.0, 0.0, 0.0, 0.5, 0.5),
       &debug_marker_array, now);
+  }
+
+  if (debug_data_.yield_stuck_detect_area) {
+    appendMarkerArray(
+      createLaneletPolygonsMarkerArray(
+        debug_data_.yield_stuck_detect_area.value(), "yield_stuck_detect_area", lane_id_, 0.6588235,
+        0.34509, 0.6588235),
+      &debug_marker_array);
   }
 
   if (debug_data_.ego_lane) {
@@ -232,6 +256,12 @@ visualization_msgs::msg::MarkerArray IntersectionModule::createDebugMarkerArray(
 
   appendMarkerArray(
     debug::createObjectsMarkerArray(
+      debug_data_.red_overshoot_ignore_targets, "red_overshoot_ignore_targets", module_id_, now,
+      0.0, 1.0, 0.0),
+    &debug_marker_array, now);
+
+  appendMarkerArray(
+    debug::createObjectsMarkerArray(
       debug_data_.stuck_targets, "stuck_targets", module_id_, now, 0.99, 0.99, 0.2),
     &debug_marker_array, now);
 
@@ -253,11 +283,23 @@ visualization_msgs::msg::MarkerArray IntersectionModule::createDebugMarkerArray(
     &debug_marker_array, now);
   */
 
-  if (debug_data_.pass_judge_wall_pose) {
+  if (debug_data_.first_pass_judge_wall_pose) {
+    const double r = debug_data_.passed_first_pass_judge ? 1.0 : 0.0;
+    const double g = debug_data_.passed_first_pass_judge ? 0.0 : 1.0;
     appendMarkerArray(
       createPoseMarkerArray(
-        debug_data_.pass_judge_wall_pose.value(), "pass_judge_wall_pose", module_id_, 0.7, 0.85,
-        0.9),
+        debug_data_.first_pass_judge_wall_pose.value(), "first_pass_judge_wall_pose", module_id_, r,
+        g, 0.0),
+      &debug_marker_array, now);
+  }
+
+  if (debug_data_.second_pass_judge_wall_pose) {
+    const double r = debug_data_.passed_second_pass_judge ? 1.0 : 0.0;
+    const double g = debug_data_.passed_second_pass_judge ? 0.0 : 1.0;
+    appendMarkerArray(
+      createPoseMarkerArray(
+        debug_data_.second_pass_judge_wall_pose.value(), "second_pass_judge_wall_pose", module_id_,
+        r, g, 0.0),
       &debug_marker_array, now);
   }
 

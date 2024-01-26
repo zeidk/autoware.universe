@@ -2,6 +2,7 @@
   ros__parameters:
     verbose: false
     max_iteration_num: 100
+    traffic_light_signal_timeout: 1.0
     planning_hz: 10.0
     backward_path_length: 5.0
     forward_path_length: 300.0
@@ -23,8 +24,6 @@
     enable_cog_on_centerline: false
     input_path_interval: 2.0
     output_path_interval: 2.0
-
-    visualize_maximum_drivable_area: true
 
     lane_following:
       drivable_area_right_bound_offset: 0.0

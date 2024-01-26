@@ -64,6 +64,7 @@ public:
 
   void onTrajectory(const Trajectory::ConstSharedPtr msg);
 
+  bool checkValidSize(const Trajectory & trajectory) const;
   bool checkValidFiniteValue(const Trajectory & trajectory);
   bool checkValidInterval(const Trajectory & trajectory);
   bool checkValidRelativeAngle(const Trajectory & trajectory);
@@ -109,14 +110,14 @@ private:
   int diag_error_count_threshold_ = 0;
   bool display_on_terminal_ = true;
 
-  Updater diag_updater_{this};
+  std::shared_ptr<Updater> diag_updater_ = nullptr;
 
   PlanningValidatorStatus validation_status_;
   ValidationParams validation_params_;  // for thresholds
 
   vehicle_info_util::VehicleInfo vehicle_info_;
 
-  bool isAllValid(const PlanningValidatorStatus & status);
+  bool isAllValid(const PlanningValidatorStatus & status) const;
 
   Trajectory::ConstSharedPtr current_trajectory_;
   Trajectory::ConstSharedPtr previous_published_trajectory_;
