@@ -15,6 +15,7 @@
 #include "pointcloud_preprocessor/outlier_filter/ring_outlier_filter_nodelet.hpp"
 
 #include "autoware_auto_geometry/common_3d.hpp"
+#include "autoware_point_types/types.hpp"
 
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 
@@ -24,6 +25,8 @@
 #include <vector>
 namespace pointcloud_preprocessor
 {
+using autoware_point_types::PointXYZIRADRT;
+
 RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions & options)
 : Filter("RingOutlierFilter", options)
 {
@@ -80,15 +83,11 @@ void RingOutlierFilterComponent::faster_filter(
   const PointCloud2ConstPtr & input, const IndicesPtr & unused_indices, PointCloud2 & output,
   const TransformInfo & transform_info)
 {
-  using autoware_point_types::PointXYZIRADRT;
-
   std::scoped_lock lock(mutex_);
   if (unused_indices) {
     RCLCPP_WARN(get_logger(), "Indices are not supported and will be ignored");
   }
   stop_watch_ptr_->toc("processing_time", true);
-
-
 
   output.point_step = sizeof(PointXYZI);
   output.data.resize(output.point_step * input->width);
@@ -257,49 +256,18 @@ void RingOutlierFilterComponent::faster_filter(
   if (publish_noise_points_) {
     setUpPointCloudFormat(input, noise_points, noise_points_size, /*num_fields=*/4);
     noise_points_publisher_->publish(noise_points);
-  // Note that `input->header.frame_id` is data before converted when `transform_info.need_transform
-  // == true`
-  output.header.frame_id = !tf_input_frame_.empty() ? tf_input_frame_ : tf_input_orig_frame_;
 
-  output.height = 1;
-  output.width = static_cast<uint32_t>(output.data.size() / output.height / output.point_step);
-  output.is_bigendian = input->is_bigendian;
-  output.is_dense = input->is_dense;
+    const auto frequency_image = createBinaryImage(noise_points);
+    const double num_filled_pixels = calculateFilledPixels(frequency_image, vertical_bins_, 36);
+    auto frequency_image_msg = toFrequencyImageMsg(frequency_image);
 
-  // set fields
-  sensor_msgs::PointCloud2Modifier pcd_modifier(output);
-  constexpr int num_fields = 4;
-  pcd_modifier.setPointCloud2Fields(
-    num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
-    sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-    "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
-
-  if (publish_excluded_points_) {
-    auto excluded_points = extractExcludedPoints(*input, output, 0.01);
-    // set fields
-    sensor_msgs::PointCloud2Modifier excluded_pcd_modifier(excluded_points);
-    excluded_pcd_modifier.setPointCloud2Fields(
-      num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
-      sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-      "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
-    excluded_points_publisher_->publish(excluded_points);
-    auto frequency_image = createBinaryImage(excluded_points);
-    int num_pixels = cv::countNonZero(frequency_image);
-    float filled =
-      static_cast<float>(num_pixels) / static_cast<float>(vertical_bins_ * 36);
-    const double visibility = 1.0f - filled;
-    // Visualization of histogram
-    cv::Mat frequency_image_colorized;
-    // Multiply bins by four to get pretty colours
-    cv::applyColorMap(frequency_image * 4, frequency_image_colorized, cv::COLORMAP_JET);
-    sensor_msgs::msg::Image::SharedPtr frequency_image_msg =
-      cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frequency_image_colorized).toImageMsg();
-    frequency_image_msg->header = input->header;
+    frequency_image_msg.header = input->header;
     // Publish histogram image
     image_pub_.publish(frequency_image_msg);
+
     tier4_debug_msgs::msg::Float32Stamped visibility_msg;
-    visibility_msg.data = (1.0f - filled);
-    visibility_msg.stamp = now();
+    visibility_msg.data = (1.0f - num_filled_pixels);
+    visibility_msg.stamp = input->header.stamp;
     visibility_pub_->publish(visibility_msg);
   }
 
@@ -322,8 +290,8 @@ void RingOutlierFilterComponent::faster_filter(
   }
 }
 
-// TODO(sykwer): Temporary Implementation: Delete this function definition when all the filter nodes
-// conform to new API
+// TODO(sykwer): Temporary Implementation: Delete this function definition when all the filter
+// nodes conform to new API
 void RingOutlierFilterComponent::filter(
   const PointCloud2ConstPtr & input, [[maybe_unused]] const IndicesPtr & indices,
   PointCloud2 & output)
@@ -370,7 +338,8 @@ void RingOutlierFilterComponent::setUpPointCloudFormat(
   size_t num_fields)
 {
   formatted_points.data.resize(points_size);
-  // Note that `input->header.frame_id` is data before converted when `transform_info.need_transform
+  // Note that `input->header.frame_id` is data before converted when
+  // `transform_info.need_transform
   // == true`
   formatted_points.header.frame_id =
     !tf_input_frame_.empty() ? tf_input_frame_ : tf_input_orig_frame_;
@@ -388,12 +357,12 @@ void RingOutlierFilterComponent::setUpPointCloudFormat(
     "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
 }
 
-cv::Mat RingOutlierFilterComponent::createBinaryImage(
-  const sensor_msgs::msg::PointCloud2 & input)
+cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::PointCloud2 & input)
 {
-  using autoware_point_types::PointXYZIRADRT;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<PointXYZIRADRT>::Ptr input_cloud(new pcl::PointCloud<PointXYZIRADRT>);
+  std::cerr << "before fromROSMsg at " << __LINE__ << std::endl;
   pcl::fromROSMsg(input, *input_cloud);
+  std::cerr << "after fromROSMsg at  " << __LINE__ << std::endl;
 
   uint32_t vertical_bins = vertical_bins_;
   uint32_t horizontal_bins = 36;
@@ -420,7 +389,6 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(
 
   pcl_noise_ring_array.resize(vertical_bins);
 
-  float max_azimuth_diff = max_azimuth_diff_;
   cv::Mat frequency_image(cv::Size(horizontal_bins, vertical_bins), CV_8UC1, cv::Scalar(0));
 
   // Split into 36 x 10 degree bins x 40 lines (TODO: change to dynamic)
@@ -431,7 +399,6 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(
     uint ring_id = single_ring.points.front().ring;
     // Analyze last segment points here
     std::vector<int> noise_frequency(horizontal_bins, 0);
-    uint current_deleted_index = 0;
     uint current_temp_segment_index = 0;
     for (uint i = 0; i < noise_frequency.size() - 1; i++) {
       if (single_ring.points.size() > 0) {
@@ -479,6 +446,28 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(
   cv::Mat binary_image;
   cv::inRange(frequency_image, noise_threshold_, 255, binary_image);
   return binary_image;
+}
+
+float RingOutlierFilterComponent::calculateFilledPixels(
+  const cv::Mat & frequency_image, const uint32_t vertical_bins, const uint32_t horizontal_bins)
+{
+  int num_pixels = cv::countNonZero(frequency_image);
+  float num_filled_pixels =
+    static_cast<float>(num_pixels) / static_cast<float>(vertical_bins * horizontal_bins);
+  return num_filled_pixels;
+}
+
+sensor_msgs::msg::Image RingOutlierFilterComponent::toFrequencyImageMsg(
+  const cv::Mat & frequency_image)
+{
+  cv_bridge::CvImage(std_msgs::msg::Header(), "mono8", frequency_image).toImageMsg();
+  // Visualization of histogram
+  cv::Mat frequency_image_colorized;
+  // Multiply bins by four to get pretty colours
+  cv::applyColorMap(frequency_image * 4, frequency_image_colorized, cv::COLORMAP_JET);
+  sensor_msgs::msg::Image::SharedPtr frequency_image_msg =
+    cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frequency_image_colorized).toImageMsg();
+  return *frequency_image_msg;
 }
 
 }  // namespace pointcloud_preprocessor

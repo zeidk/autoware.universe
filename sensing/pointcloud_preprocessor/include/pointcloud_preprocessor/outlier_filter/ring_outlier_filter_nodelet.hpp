@@ -29,6 +29,8 @@
 #endif
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -36,12 +38,6 @@ namespace pointcloud_preprocessor
 {
 using autoware_point_types::PointXYZI;
 using point_cloud_msg_wrapper::PointCloud2Modifier;
-
-std::unordered_map<std::string, uint8_t> roi_mode_map_ = {
-  {"No_ROI", 0},
-  {"Fixed_xyz_ROI", 1},
-  {"Fixed_azimuth_ROI", 2},
-};
 
 class RingOutlierFilterComponent : public pointcloud_preprocessor::Filter
 {
@@ -85,6 +81,12 @@ private:
   float max_azimuth_deg_;
   float max_distance_;
 
+  std::unordered_map<std::string, uint8_t> roi_mode_map_ = {
+    {"No_ROI", 0},
+    {"Fixed_xyz_ROI", 1},
+    {"Fixed_azimuth_ROI", 2},
+  };
+
   /** \brief Parameter service callback result : needed to be hold */
   OnSetParametersCallbackHandle::SharedPtr set_param_res_;
 
@@ -111,6 +113,9 @@ private:
     size_t num_fields);
 
   cv::Mat createBinaryImage(const PointCloud2 & input);
+  float calculateFilledPixels(
+    const cv::Mat & frequency_image, const uint32_t vertical_bins, const uint32_t horizontal_bins);
+  sensor_msgs::msg::Image toFrequencyImageMsg(const cv::Mat & frequency_image);
 
 public:
   PCL_MAKE_ALIGNED_OPERATOR_NEW
