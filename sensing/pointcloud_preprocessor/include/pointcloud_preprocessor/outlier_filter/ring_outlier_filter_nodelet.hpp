@@ -19,7 +19,14 @@
 #include "pointcloud_preprocessor/filter.hpp"
 #include "pointcloud_preprocessor/transform_info.hpp"
 
+#include <image_transport/image_transport.hpp>
 #include <point_cloud_msg_wrapper/point_cloud_msg_wrapper.hpp>
+
+#if __has_include(<cv_bridge/cv_bridge.hpp>)
+#include <cv_bridge/cv_bridge.hpp>
+#else
+#include <cv_bridge/cv_bridge.h>
+#endif
 
 #include <memory>
 #include <utility>
@@ -29,6 +36,12 @@ namespace pointcloud_preprocessor
 {
 using autoware_point_types::PointXYZI;
 using point_cloud_msg_wrapper::PointCloud2Modifier;
+
+std::unordered_map<std::string, uint8_t> roi_mode_map_ = {
+  {"No_ROI", 0},
+  {"Fixed_xyz_ROI", 1},
+  {"Fixed_azimuth_ROI", 2},
+};
 
 class RingOutlierFilterComponent : public pointcloud_preprocessor::Filter
 {
@@ -42,16 +55,35 @@ protected:
     const PointCloud2ConstPtr & input, const IndicesPtr & indices, PointCloud2 & output,
     const TransformInfo & transform_info);
 
+  image_transport::Publisher image_pub_;
+  rclcpp::Publisher<tier4_debug_msgs::msg::Float32Stamped>::SharedPtr visibility_pub_;
+
 private:
   /** \brief publisher of excluded pointcloud for debug reason. **/
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr excluded_points_publisher_;
+  rclcpp::Publisher<PointCloud2>::SharedPtr noise_points_publisher_;
 
   double distance_ratio_;
   double object_length_threshold_;
   int num_points_threshold_;
   uint16_t max_rings_num_;
   size_t max_points_num_per_ring_;
-  bool publish_excluded_points_;
+  bool publish_noise_points_;
+
+  // for visibility score
+  int noise_threshold_;
+  int vertical_bins_;
+  float max_azimuth_diff_;
+  std::string roi_mode_;
+  float x_max_;
+  float x_min_;
+  float y_max_;
+  float y_min_;
+  float z_max_;
+  float z_min_;
+
+  float min_azimuth_deg_;
+  float max_azimuth_deg_;
+  float max_distance_;
 
   /** \brief Parameter service callback result : needed to be hold */
   OnSetParametersCallbackHandle::SharedPtr set_param_res_;
@@ -73,8 +105,12 @@ private:
 
     return x * x + y * y + z * z >= object_length_threshold_ * object_length_threshold_;
   }
-  PointCloud2 extractExcludedPoints(
-    const PointCloud2 & input, const PointCloud2 & output, float epsilon);
+
+  void setUpPointCloudFormat(
+    const PointCloud2ConstPtr & input, PointCloud2 & formatted_points, size_t points_size,
+    size_t num_fields);
+
+  cv::Mat createBinaryImage(const PointCloud2 & input);
 
 public:
   PCL_MAKE_ALIGNED_OPERATOR_NEW

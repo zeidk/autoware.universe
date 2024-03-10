@@ -33,8 +33,11 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     using tier4_autoware_utils::StopWatch;
     stop_watch_ptr_ = std::make_unique<StopWatch<std::chrono::milliseconds>>();
     debug_publisher_ = std::make_unique<DebugPublisher>(this, "ring_outlier_filter");
-    excluded_points_publisher_ =
-      this->create_publisher<sensor_msgs::msg::PointCloud2>("debug/ring_outlier_filter", 1);
+    noise_points_publisher_ = this->create_publisher<PointCloud2>("noise/ring_outlier_filter", 1);
+    image_pub_ =
+      image_transport::create_publisher(this, "ring_outlier_filter/debug/frequency_image");
+    visibility_pub_ = create_publisher<tier4_debug_msgs::msg::Float32Stamped>(
+      "ring_outlier_filter/debug/visibility", rclcpp::SensorDataQoS());
     stop_watch_ptr_->tic("cyclic_time");
     stop_watch_ptr_->tic("processing_time");
   }
@@ -48,8 +51,22 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     max_rings_num_ = static_cast<uint16_t>(declare_parameter("max_rings_num", 128));
     max_points_num_per_ring_ =
       static_cast<size_t>(declare_parameter("max_points_num_per_ring", 4000));
-    publish_excluded_points_ =
-      static_cast<bool>(declare_parameter("publish_excluded_points", false));
+    publish_noise_points_ = static_cast<bool>(declare_parameter("publish_noise_points", false));
+    x_max_ = static_cast<float>(declare_parameter("x_max", 18.0));
+    x_min_ = static_cast<float>(declare_parameter("x_min", -12.0));
+    y_max_ = static_cast<float>(declare_parameter("y_max", 2.0));
+    y_min_ = static_cast<float>(declare_parameter("y_min", -2.0));
+    z_max_ = static_cast<float>(declare_parameter("z_max", 10.0));
+    z_min_ = static_cast<float>(declare_parameter("z_min", 0.0));
+
+    min_azimuth_deg_ = static_cast<float>(declare_parameter("min_azimuth_deg", 135.0));
+    max_azimuth_deg_ = static_cast<float>(declare_parameter("max_azimuth_deg", 225.0));
+    max_distance_ = static_cast<float>(declare_parameter("max_distance", 12.0));
+    vertical_bins_ = static_cast<int>(declare_parameter("vertical_bins", 128));
+    max_azimuth_diff_ = static_cast<float>(declare_parameter("max_azimuth_diff", 50.0));
+    noise_threshold_ = static_cast<int>(declare_parameter("noise_threshold", 2));
+
+    roi_mode_ = static_cast<std::string>(declare_parameter("roi_mode", "Fixed_xyz_ROI"));
   }
 
   using std::placeholders::_1;
@@ -63,15 +80,27 @@ void RingOutlierFilterComponent::faster_filter(
   const PointCloud2ConstPtr & input, const IndicesPtr & unused_indices, PointCloud2 & output,
   const TransformInfo & transform_info)
 {
+  using autoware_point_types::PointXYZIRADRT;
+
   std::scoped_lock lock(mutex_);
   if (unused_indices) {
     RCLCPP_WARN(get_logger(), "Indices are not supported and will be ignored");
   }
   stop_watch_ptr_->toc("processing_time", true);
 
+
+
   output.point_step = sizeof(PointXYZI);
   output.data.resize(output.point_step * input->width);
   size_t output_size = 0;
+
+  // Set up the noise points cloud, if noise points are to be published.
+  PointCloud2 noise_points;
+  size_t noise_points_size = 0;
+  if (publish_noise_points_) {
+    noise_points.point_step = sizeof(PointXYZI);
+    noise_points.data.resize(noise_points.point_step * input->width);
+  }
 
   const auto ring_offset =
     input->fields.at(static_cast<size_t>(autoware_point_types::PointIndex::Ring)).offset;
@@ -153,6 +182,26 @@ void RingOutlierFilterComponent::faster_filter(
 
           output_size += output.point_step;
         }
+      } else if (publish_noise_points_) {
+        for (int i = walk_first_idx; i <= walk_last_idx; i++) {
+          auto noise_ptr = reinterpret_cast<PointXYZI *>(&noise_points.data[noise_points_size]);
+          auto input_ptr =
+            reinterpret_cast<const PointXYZI *>(&input->data[indices[walk_first_idx]]);
+          if (transform_info.need_transform) {
+            Eigen::Vector4f p(input_ptr->x, input_ptr->y, input_ptr->z, 1);
+            p = transform_info.eigen_transform * p;
+            noise_ptr->x = p[0];
+            noise_ptr->y = p[1];
+            noise_ptr->z = p[2];
+          } else {
+            *noise_ptr = *input_ptr;
+          }
+          const float & intensity = *reinterpret_cast<const float *>(
+            &input->data[indices[walk_first_idx] + intensity_offset]);
+          noise_ptr->intensity = intensity;
+
+          noise_points_size += noise_points.point_step;
+        }
       }
 
       walk_first_idx = idx + 1;
@@ -182,11 +231,32 @@ void RingOutlierFilterComponent::faster_filter(
 
         output_size += output.point_step;
       }
+    } else if (publish_noise_points_) {
+      for (int i = walk_first_idx; i < walk_last_idx; i++) {
+        auto noise_ptr = reinterpret_cast<PointXYZI *>(&noise_points.data[noise_points_size]);
+        auto input_ptr = reinterpret_cast<const PointXYZI *>(&input->data[indices[i]]);
+        if (transform_info.need_transform) {
+          Eigen::Vector4f p(input_ptr->x, input_ptr->y, input_ptr->z, 1);
+          p = transform_info.eigen_transform * p;
+          noise_ptr->x = p[0];
+          noise_ptr->y = p[1];
+          noise_ptr->z = p[2];
+        } else {
+          *noise_ptr = *input_ptr;
+        }
+        const float & intensity =
+          *reinterpret_cast<const float *>(&input->data[indices[i] + intensity_offset]);
+        noise_ptr->intensity = intensity;
+        noise_points_size += noise_points.point_step;
+      }
     }
   }
 
-  output.data.resize(output_size);
+  setUpPointCloudFormat(input, output, output_size, /*num_fields=*/4);
 
+  if (publish_noise_points_) {
+    setUpPointCloudFormat(input, noise_points, noise_points_size, /*num_fields=*/4);
+    noise_points_publisher_->publish(noise_points);
   // Note that `input->header.frame_id` is data before converted when `transform_info.need_transform
   // == true`
   output.header.frame_id = !tf_input_frame_.empty() ? tf_input_frame_ : tf_input_orig_frame_;
@@ -213,6 +283,24 @@ void RingOutlierFilterComponent::faster_filter(
       sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
       "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
     excluded_points_publisher_->publish(excluded_points);
+    auto frequency_image = createBinaryImage(excluded_points);
+    int num_pixels = cv::countNonZero(frequency_image);
+    float filled =
+      static_cast<float>(num_pixels) / static_cast<float>(vertical_bins_ * 36);
+    const double visibility = 1.0f - filled;
+    // Visualization of histogram
+    cv::Mat frequency_image_colorized;
+    // Multiply bins by four to get pretty colours
+    cv::applyColorMap(frequency_image * 4, frequency_image_colorized, cv::COLORMAP_JET);
+    sensor_msgs::msg::Image::SharedPtr frequency_image_msg =
+      cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", frequency_image_colorized).toImageMsg();
+    frequency_image_msg->header = input->header;
+    // Publish histogram image
+    image_pub_.publish(frequency_image_msg);
+    tier4_debug_msgs::msg::Float32Stamped visibility_msg;
+    visibility_msg.data = (1.0f - filled);
+    visibility_msg.stamp = now();
+    visibility_pub_->publish(visibility_msg);
   }
 
   // add processing time for debug
@@ -260,9 +348,14 @@ rcl_interfaces::msg::SetParametersResult RingOutlierFilterComponent::paramCallba
   if (get_param(p, "num_points_threshold", num_points_threshold_)) {
     RCLCPP_DEBUG(get_logger(), "Setting new num_points_threshold to: %d.", num_points_threshold_);
   }
-  if (get_param(p, "publish_excluded_points", publish_excluded_points_)) {
-    RCLCPP_DEBUG(
-      get_logger(), "Setting new publish_excluded_points to: %d.", publish_excluded_points_);
+  if (get_param(p, "publish_noise_points", publish_noise_points_)) {
+    RCLCPP_DEBUG(get_logger(), "Setting new publish_noise_points to: %d.", publish_noise_points_);
+  }
+  if (get_param(p, "vertical_bins", vertical_bins_)) {
+    RCLCPP_DEBUG(get_logger(), "Setting new vertical_bins to: %d.", vertical_bins_);
+  }
+  if (get_param(p, "max_azimuth_diff", max_azimuth_diff_)) {
+    RCLCPP_DEBUG(get_logger(), "Setting new max_azimuth_diff to: %f.", max_azimuth_diff_);
   }
 
   rcl_interfaces::msg::SetParametersResult result;
@@ -272,51 +365,120 @@ rcl_interfaces::msg::SetParametersResult RingOutlierFilterComponent::paramCallba
   return result;
 }
 
-sensor_msgs::msg::PointCloud2 RingOutlierFilterComponent::extractExcludedPoints(
-  const sensor_msgs::msg::PointCloud2 & input, const sensor_msgs::msg::PointCloud2 & output,
-  float epsilon)
+void RingOutlierFilterComponent::setUpPointCloudFormat(
+  const PointCloud2ConstPtr & input, PointCloud2 & formatted_points, size_t points_size,
+  size_t num_fields)
 {
-  // Convert ROS PointCloud2 message to PCL point cloud for easier manipulation
-  pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::fromROSMsg(input, *input_cloud);
-  pcl::fromROSMsg(output, *output_cloud);
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr excluded_points(new pcl::PointCloud<pcl::PointXYZ>);
-
-  pcl::search::Search<pcl::PointXYZ>::Ptr tree;
-  if (output_cloud->isOrganized()) {
-    tree.reset(new pcl::search::OrganizedNeighbor<pcl::PointXYZ>());
-  } else {
-    tree.reset(new pcl::search::KdTree<pcl::PointXYZ>(false));
-  }
-  tree->setInputCloud(output_cloud);
-  std::vector<int> nn_indices(1);
-  std::vector<float> nn_distances(1);
-  for (const auto & point : input_cloud->points) {
-    if (!tree->nearestKSearch(point, 1, nn_indices, nn_distances)) {
-      continue;
-    }
-    if (nn_distances[0] > epsilon) {
-      excluded_points->points.push_back(point);
-    }
-  }
-
-  sensor_msgs::msg::PointCloud2 excluded_points_msg;
-  pcl::toROSMsg(*excluded_points, excluded_points_msg);
-
-  // Set the metadata for the excluded points message based on the input cloud
-  excluded_points_msg.height = 1;
-  excluded_points_msg.width =
-    static_cast<uint32_t>(output.data.size() / output.height / output.point_step);
-  excluded_points_msg.row_step = static_cast<uint32_t>(output.data.size() / output.height);
-  excluded_points_msg.is_bigendian = input.is_bigendian;
-  excluded_points_msg.is_dense = input.is_dense;
-  excluded_points_msg.header = input.header;
-  excluded_points_msg.header.frame_id =
+  formatted_points.data.resize(points_size);
+  // Note that `input->header.frame_id` is data before converted when `transform_info.need_transform
+  // == true`
+  formatted_points.header.frame_id =
     !tf_input_frame_.empty() ? tf_input_frame_ : tf_input_orig_frame_;
+  formatted_points.data.resize(formatted_points.point_step * input->width);
+  formatted_points.height = 1;
+  formatted_points.width =
+    static_cast<uint32_t>(formatted_points.data.size() / formatted_points.point_step);
+  formatted_points.is_bigendian = input->is_bigendian;
+  formatted_points.is_dense = input->is_dense;
 
-  return excluded_points_msg;
+  sensor_msgs::PointCloud2Modifier pcd_modifier(formatted_points);
+  pcd_modifier.setPointCloud2Fields(
+    num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
+    sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+    "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
+}
+
+cv::Mat RingOutlierFilterComponent::createBinaryImage(
+  const sensor_msgs::msg::PointCloud2 & input)
+{
+  using autoware_point_types::PointXYZIRADRT;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::fromROSMsg(input, *input_cloud);
+
+  uint32_t vertical_bins = vertical_bins_;
+  uint32_t horizontal_bins = 36;
+  float max_azimuth = 36000.0f;
+  float min_azimuth = 0.0f;
+  switch (roi_mode_map_[roi_mode_]) {
+    case 2: {
+      max_azimuth = max_azimuth_deg_ * 100.0;
+      min_azimuth = min_azimuth_deg_ * 100.0;
+      break;
+    }
+
+    default: {
+      max_azimuth = 36000.0f;
+      min_azimuth = 0.0f;
+      break;
+    }
+  }
+
+  uint32_t horizontal_resolution =
+    static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
+
+  std::vector<pcl::PointCloud<PointXYZIRADRT>> pcl_noise_ring_array;
+
+  pcl_noise_ring_array.resize(vertical_bins);
+
+  float max_azimuth_diff = max_azimuth_diff_;
+  cv::Mat frequency_image(cv::Size(horizontal_bins, vertical_bins), CV_8UC1, cv::Scalar(0));
+
+  // Split into 36 x 10 degree bins x 40 lines (TODO: change to dynamic)
+  for (const auto & p : input_cloud->points) {
+    pcl_noise_ring_array.at(p.ring).push_back(p);
+  }
+  for (const auto & single_ring : pcl_noise_ring_array) {
+    uint ring_id = single_ring.points.front().ring;
+    // Analyze last segment points here
+    std::vector<int> noise_frequency(horizontal_bins, 0);
+    uint current_deleted_index = 0;
+    uint current_temp_segment_index = 0;
+    for (uint i = 0; i < noise_frequency.size() - 1; i++) {
+      if (single_ring.points.size() > 0) {
+        while ((single_ring.points[current_temp_segment_index].azimuth < 0.f
+                  ? 0.f
+                  : single_ring.points[current_temp_segment_index].azimuth) <
+                 ((i + 1 + static_cast<uint>(min_azimuth / horizontal_resolution)) *
+                  horizontal_resolution) &&
+               current_temp_segment_index < (single_ring.points.size() - 1)) {
+          switch (roi_mode_map_[roi_mode_]) {
+            case 1: {
+              if (
+                single_ring.points[current_temp_segment_index].x < x_max_ &&
+                single_ring.points[current_temp_segment_index].x > x_min_ &&
+                single_ring.points[current_temp_segment_index].y > y_max_ &&
+                single_ring.points[current_temp_segment_index].y < y_min_ &&
+                single_ring.points[current_temp_segment_index].z < z_max_ &&
+                single_ring.points[current_temp_segment_index].z > z_min_) {
+                noise_frequency[i] = noise_frequency[i] + 1;
+              }
+              break;
+            }
+            case 2: {
+              if (
+                single_ring.points[current_temp_segment_index].azimuth < max_azimuth &&
+                single_ring.points[current_temp_segment_index].azimuth > min_azimuth &&
+                single_ring.points[current_temp_segment_index].distance < max_distance_) {
+                noise_frequency[i] = noise_frequency[i] + 1;
+              }
+              break;
+            }
+            default: {
+              noise_frequency[i] = noise_frequency[i] + 1;
+              break;
+            }
+          }
+        }
+        current_temp_segment_index++;
+        frequency_image.at<uchar>(ring_id, i) = noise_frequency[i];
+      }
+    }
+  }
+
+  // Threshold for diagnostics (tunable)
+  cv::Mat binary_image;
+  cv::inRange(frequency_image, noise_threshold_, 255, binary_image);
+  return binary_image;
 }
 
 }  // namespace pointcloud_preprocessor
