@@ -446,7 +446,7 @@ public:
   bool calculateMPC(
     const SteeringReport & current_steer, const Odometry & current_kinematics,
     AckermannLateralCommand & ctrl_cmd, Trajectory & predicted_trajectory,
-    Float32MultiArrayStamped & diagnostic);
+    Float32MultiArrayStamped & diagnostic, const std::string & qp_solver_type = "osqp");
 
   /**
    * @brief Set the reference trajectory to be followed.
