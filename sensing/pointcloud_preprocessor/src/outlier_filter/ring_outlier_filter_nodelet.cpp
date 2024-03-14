@@ -72,8 +72,6 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     noise_threshold_ = static_cast<int>(declare_parameter("noise_threshold", 2));
 
     roi_mode_ = static_cast<std::string>(declare_parameter("roi_mode", "Fixed_xyz_ROI"));
-    publish_outlier_pointcloud_ =
-      static_cast<bool>(declare_parameter("publish_outlier_pointcloud", false));
   }
 
   using std::placeholders::_1;
@@ -297,8 +295,8 @@ void RingOutlierFilterComponent::faster_filter(
   }
 }
 
-// TODO(sykwer): Temporary Implementation: Delete this function definition when all the filter
-// nodes conform to new API
+// TODO(sykwer): Temporary Implementation: Delete this function definition when all the filter nodes
+// conform to new API
 void RingOutlierFilterComponent::filter(
   const PointCloud2ConstPtr & input, [[maybe_unused]] const IndicesPtr & indices,
   PointCloud2 & output)
