@@ -58,14 +58,14 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     publish_outlier_pointcloud_ =
       static_cast<bool>(declare_parameter("publish_outlier_pointcloud", false));
     x_max_ = static_cast<float>(declare_parameter("x_max", 18.0));
-    x_min_ = static_cast<float>(declare_parameter("x_min", -12.0));
-    y_max_ = static_cast<float>(declare_parameter("y_max", 2.0));
-    y_min_ = static_cast<float>(declare_parameter("y_min", -2.0));
+    x_min_ = static_cast<float>(declare_parameter("x_min", -18.0));
+    y_max_ = static_cast<float>(declare_parameter("y_max", -3.0));
+    y_min_ = static_cast<float>(declare_parameter("y_min", -18.0));
     z_max_ = static_cast<float>(declare_parameter("z_max", 10.0));
     z_min_ = static_cast<float>(declare_parameter("z_min", 0.0));
 
-    min_azimuth_deg_ = static_cast<float>(declare_parameter("min_azimuth_deg", 135.0));
-    max_azimuth_deg_ = static_cast<float>(declare_parameter("max_azimuth_deg", 225.0));
+    min_azimuth_deg_ = static_cast<float>(declare_parameter("min_azimuth_deg", 45.0));
+    max_azimuth_deg_ = static_cast<float>(declare_parameter("max_azimuth_deg", 135.0));
     max_distance_ = static_cast<float>(declare_parameter("max_distance", 12.0));
     vertical_bins_ = static_cast<int>(declare_parameter("vertical_bins", 128));
     max_azimuth_diff_ = static_cast<float>(declare_parameter("max_azimuth_diff", 50.0));
