@@ -40,7 +40,7 @@ MPC::MPC(rclcpp::Node & node)
 bool MPC::calculateMPC(
   const SteeringReport & current_steer, const Odometry & current_kinematics,
   AckermannLateralCommand & ctrl_cmd, Trajectory & predicted_trajectory,
-  Float32MultiArrayStamped & diagnostic)
+  Float32MultiArrayStamped & diagnostic, const std::string & qp_solver_type)
 {
   // since the reference trajectory does not take into account the current velocity of the ego
   // vehicle, it needs to calculate the trajectory velocity considering the longitudinal dynamics.
@@ -75,13 +75,22 @@ bool MPC::calculateMPC(
     return fail_warn_throttle("trajectory resampling failed. Stop MPC.");
   }
 
-  // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
-  const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
+  bool success_opt;
+  VectorXd Uex;
+  MPCMatrix mpc_matrix;
+  if (qp_solver_type == "cgmres") {
+    success_opt = false;
+    Uex = VectorXd::Zero(1);
 
-  // solve Optimization problem
-  const auto [success_opt, Uex] = executeOptimization(
-    mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
-    current_kinematics.twist.twist.linear.x);
+  } else {
+    // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
+    mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
+
+    // solve Optimization problem
+    std::tie(success_opt, Uex) = executeOptimization(
+      mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+      current_kinematics.twist.twist.linear.x);
+  }
   if (!success_opt) {
     return fail_warn_throttle("optimization failed. Stop MPC.");
   }
