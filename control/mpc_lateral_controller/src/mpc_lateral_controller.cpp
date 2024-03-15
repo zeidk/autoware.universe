@@ -15,6 +15,7 @@
 #include "mpc_lateral_controller/mpc_lateral_controller.hpp"
 
 #include "motion_utils/trajectory/trajectory.hpp"
+#include "mpc_lateral_controller/qp_solver/qp_solver_cgmres.hpp"
 #include "mpc_lateral_controller/qp_solver/qp_solver_osqp.hpp"
 #include "mpc_lateral_controller/qp_solver/qp_solver_unconstraint_fast.hpp"
 #include "mpc_lateral_controller/vehicle_model/vehicle_model_bicycle_dynamics.hpp"
@@ -135,6 +136,8 @@ MpcLateralController::MpcLateralController(rclcpp::Node & node)
   m_mpc->ego_nearest_yaw_threshold = m_ego_nearest_yaw_threshold;
 
   m_mpc->m_debug_publish_predicted_trajectory = dp_bool("debug_publish_predicted_trajectory");
+  m_mpc->m_debug_publish_resampled_reference_trajectory =
+    node.declare_parameter("debug_publish_resampled_reference_trajectory", true);
 
   m_pub_predicted_traj = node.create_publisher<Trajectory>("~/output/predicted_trajectory", 1);
   m_pub_debug_values =
@@ -198,15 +201,20 @@ std::shared_ptr<QPSolverInterface> MpcLateralController::createQPSolverInterface
 {
   std::shared_ptr<QPSolverInterface> qpsolver_ptr;
 
-  const std::string qp_solver_type = node.declare_parameter<std::string>("qp_solver_type");
+  qp_solver_type_ = node.declare_parameter<std::string>("qp_solver_type");
 
-  if (qp_solver_type == "unconstraint_fast") {
+  if (qp_solver_type_ == "unconstraint_fast") {
     qpsolver_ptr = std::make_shared<QPSolverEigenLeastSquareLLT>();
     return qpsolver_ptr;
   }
 
-  if (qp_solver_type == "osqp") {
+  if (qp_solver_type_ == "osqp") {
     qpsolver_ptr = std::make_shared<QPSolverOSQP>(logger_);
+    return qpsolver_ptr;
+  }
+
+  if (qp_solver_type_ == "cgmres") {
+    qpsolver_ptr = std::make_shared<QPSolverCGMRES>(logger_);
     return qpsolver_ptr;
   }
 
@@ -253,7 +261,8 @@ trajectory_follower::LateralOutput MpcLateralController::run(
   }
 
   const bool is_mpc_solved = m_mpc->calculateMPC(
-    m_current_steering, m_current_kinematic_state, ctrl_cmd, predicted_traj, debug_values);
+    m_current_steering, m_current_kinematic_state, ctrl_cmd, predicted_traj, debug_values,
+    qp_solver_type_);
 
   // reset previous MPC result
   // Note: When a large deviation from the trajectory occurs, the optimization stops and

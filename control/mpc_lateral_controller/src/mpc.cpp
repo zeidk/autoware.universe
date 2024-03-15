@@ -33,12 +33,14 @@ MPC::MPC(rclcpp::Node & node)
 {
   m_debug_frenet_predicted_trajectory_pub = node.create_publisher<Trajectory>(
     "~/debug/predicted_trajectory_in_frenet_coordinate", rclcpp::QoS(1));
+  m_debug_resampled_reference_trajectory_pub =
+    node.create_publisher<Trajectory>("~/debug/resampled_reference_trajectory", rclcpp::QoS(1));
 }
 
 bool MPC::calculateMPC(
   const SteeringReport & current_steer, const Odometry & current_kinematics,
   AckermannLateralCommand & ctrl_cmd, Trajectory & predicted_trajectory,
-  Float32MultiArrayStamped & diagnostic)
+  Float32MultiArrayStamped & diagnostic, const std::string & qp_solver_type)
 {
   // since the reference trajectory does not take into account the current velocity of the ego
   // vehicle, it needs to calculate the trajectory velocity considering the longitudinal dynamics.
@@ -73,13 +75,22 @@ bool MPC::calculateMPC(
     return fail_warn_throttle("trajectory resampling failed. Stop MPC.");
   }
 
-  // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
-  const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
+  bool success_opt;
+  VectorXd Uex;
+  MPCMatrix mpc_matrix;
+  if (qp_solver_type == "cgmres") {
+    success_opt = false;
+    Uex = VectorXd::Zero(1);
 
-  // solve Optimization problem
-  const auto [success_opt, Uex] = executeOptimization(
-    mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
-    current_kinematics.twist.twist.linear.x);
+  } else {
+    // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
+    mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
+
+    // solve Optimization problem
+    std::tie(success_opt, Uex) = executeOptimization(
+      mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+      current_kinematics.twist.twist.linear.x);
+  }
   if (!success_opt) {
     return fail_warn_throttle("optimization failed. Stop MPC.");
   }
@@ -309,6 +320,11 @@ std::pair<bool, MPCTrajectory> MPC::resampleMPCTrajectoryByTime(
   if (!MPCUtils::linearInterpMPCTrajectory(input.relative_time, input, mpc_time_v, output)) {
     warn_throttle("calculateMPC: mpc resample error. stop mpc calculation. check code!");
     return {false, {}};
+  }
+  // Publish resampled reference trajectory for debug purpose.
+  if (m_debug_publish_resampled_reference_trajectory) {
+    const auto converted_output = MPCUtils::convertToAutowareTrajectory(output);
+    m_debug_resampled_reference_trajectory_pub->publish(converted_output);
   }
   return {true, output};
 }
@@ -568,9 +584,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   addSteerWeightF(prediction_dt, f);
 
   MatrixXd A = MatrixXd::Identity(DIM_U_N, DIM_U_N);
-  for (int i = 1; i < DIM_U_N; i++) {
-    A(i, i - 1) = -1.0;
-  }
+  A.bottomLeftCorner(DIM_U_N - 1, DIM_U_N - 1) = -MatrixXd::Identity(DIM_U_N - 1, DIM_U_N - 1);
 
   // steering angle limit
   VectorXd lb = VectorXd::Constant(DIM_U_N, -m_steer_lim);  // min steering angle
