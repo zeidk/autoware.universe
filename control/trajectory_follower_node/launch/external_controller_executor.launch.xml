@@ -8,8 +8,8 @@
   <!-- <arg name="enable_autonomous_emergency_braking" default="false"/> -->
   <!-- <arg name="enable_predicted_path_checker" default="false"/>  -->
 
-  <node pkg="trajectory_follower_node" exec="controller_node_exe" name="external_controller_executor" output="screen" namespace="control/trajectory_follower">
-    <param from="$(find-pkg-share autoware_launch)/config/control/trajectory_follower/lateral/mpc.param.yaml"/>
+  <node pkg="trajectory_follower_node" exec="controller_node_exe" name="external_controller_executor" output="screen" namespace="control/trajectory_follower" args="--ros-args --log-level info">
+    <param from="$(find-pkg-share trajectory_follower_node)/param/lateral/mpc_cgmres.param.yaml"/>
     <param from="$(find-pkg-share autoware_launch)/config/control/trajectory_follower/longitudinal/pid.param.yaml"/>
     <param from="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/nearest_search.param.yaml"/>
     <param from="$(find-pkg-share autoware_launch)/config/control/trajectory_follower/trajectory_follower_node.param.yaml"/>
@@ -29,6 +29,5 @@
     <remap from="~/output/control_cmd" to="control_cmd/external"/>
     <remap from="~/output/debug/predicted_trajectory_in_frenet_coordinate" to="/external/debug/predicted_trajectory_in_frenet_coordinate"/>
     <remap from="~/output/debug/resampled_reference_trajectory" to="/external/debug/resampled_reference_trajectory"/>
-
   </node>
 </launch>
