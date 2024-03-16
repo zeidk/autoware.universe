@@ -17,6 +17,7 @@
 
 #include "behavior_path_avoidance_module/data_structs.hpp"
 #include "behavior_path_avoidance_module/utils.hpp"
+#include "behavior_path_planner_common/utils/utils.hpp"
 
 #include <motion_utils/distance/distance.hpp>
 
@@ -134,6 +135,24 @@ public:
       shift_length, getLateralMaxJerkLimit(), getAvoidanceEgoSpeed());
   }
 
+  double getFrontConstantDistance(const ObjectData & object) const
+  {
+    const auto object_type = utils::getHighestProbLabel(object.object.classification);
+    const auto object_parameter = parameters_->object_parameters.at(object_type);
+    const auto & additional_buffer_longitudinal =
+      object_parameter.use_conservative_buffer_longitudinal ? data_->parameters.base_link2front
+                                                            : 0.0;
+    return object_parameter.safety_buffer_longitudinal + additional_buffer_longitudinal;
+  }
+
+  double getRearConstantDistance(const ObjectData & object) const
+  {
+    const auto object_type = utils::getHighestProbLabel(object.object.classification);
+    const auto object_parameter = parameters_->object_parameters.at(object_type);
+    return object_parameter.safety_buffer_longitudinal + data_->parameters.base_link2rear +
+           object.length;
+  }
+
   double getEgoShift() const
   {
     validate();
@@ -176,7 +195,8 @@ public:
   {
     using utils::avoidance::calcShiftLength;
 
-    const auto shift_length = calcShiftLength(is_on_right, object.overhang_dist, margin);
+    const auto shift_length =
+      calcShiftLength(is_on_right, object.overhang_points.front().first, margin);
     return is_on_right ? std::min(shift_length, getLeftShiftBound())
                        : std::max(shift_length, getRightShiftBound());
   }
@@ -261,11 +281,39 @@ public:
 
   bool isComfortable(const AvoidLineArray & shift_lines) const
   {
+    const auto JERK_BUFFER = 0.1;  // [m/sss]
     return std::all_of(shift_lines.begin(), shift_lines.end(), [&](const auto & line) {
       return PathShifter::calcJerkFromLatLonDistance(
                line.getRelativeLength(), line.getRelativeLongitudinal(), getAvoidanceEgoSpeed()) <
-             getLateralMaxJerkLimit();
+             getLateralMaxJerkLimit() + JERK_BUFFER;
     });
+  }
+
+  bool isReady(const AvoidLineArray & new_shift_lines, const double current_shift_length) const
+  {
+    if (std::abs(current_shift_length) < 1e-3) {
+      return true;
+    }
+
+    if (new_shift_lines.empty()) {
+      return true;
+    }
+
+    const auto front_shift_relative_length = new_shift_lines.front().getRelativeLength();
+
+    // same direction shift.
+    if (current_shift_length > 0.0 && front_shift_relative_length > 0.0) {
+      return true;
+    }
+
+    // same direction shift.
+    if (current_shift_length < 0.0 && front_shift_relative_length < 0.0) {
+      return true;
+    }
+
+    // keep waiting the other side shift approval until the ego reaches shift length threshold.
+    const auto ego_shift_ratio = (current_shift_length - getEgoShift()) / current_shift_length;
+    return ego_shift_ratio < parameters_->ratio_for_return_shift_approval + 1e-3;
   }
 
   bool isShifted() const
