@@ -56,8 +56,6 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
   const auto lateral_share_dir =
     ament_index_cpp::get_package_share_directory("mpc_lateral_controller");
   rclcpp::NodeOptions node_options;
-  node_options.append_parameter_override("ctrl_period", 0.03);
-  node_options.append_parameter_override("timeout_thr_sec", 0.5);
   node_options.append_parameter_override("lateral_controller_mode", "mpc");
   node_options.append_parameter_override("longitudinal_controller_mode", "pid");
   node_options.append_parameter_override(
@@ -282,6 +280,9 @@ TEST_F(FakeNodeFixture, right_turn)
 
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
   ASSERT_TRUE(tester.received_control_command);
+  std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
+  std::cerr << "lat steer tire rotation rate: "
+            << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
   EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
@@ -310,6 +311,9 @@ TEST_F(FakeNodeFixture, left_turn)
 
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
   ASSERT_TRUE(tester.received_control_command);
+  std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
+  std::cerr << "lat steer tire rotation rate: "
+            << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
   EXPECT_GT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
   EXPECT_GT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
   EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
