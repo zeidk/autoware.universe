@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "object_association_merger/node.hpp"
+#include "object_merger/node.hpp"
 
-#include "object_association_merger/utils/utils.hpp"
+#include "object_merger/utils/utils.hpp"
 #include "object_recognition_utils/object_recognition_utils.hpp"
 #include "tier4_autoware_utils/geometry/geometry.hpp"
 
@@ -77,20 +77,13 @@ ObjectAssociationMergerNode::ObjectAssociationMergerNode(const rclcpp::NodeOptio
   tf_buffer_(get_clock()),
   tf_listener_(tf_buffer_),
   object0_sub_(this, "input/object0", rclcpp::QoS{1}.get_rmw_qos_profile()),
-  object1_sub_(this, "input/object1", rclcpp::QoS{1}.get_rmw_qos_profile()),
-  sync_(SyncPolicy(10), object0_sub_, object1_sub_)
+  object1_sub_(this, "input/object1", rclcpp::QoS{1}.get_rmw_qos_profile())
 {
-  // Create publishers and subscribers
-  using std::placeholders::_1;
-  using std::placeholders::_2;
-  sync_.registerCallback(std::bind(&ObjectAssociationMergerNode::objectsCallback, this, _1, _2));
-  merged_object_pub_ = create_publisher<autoware_auto_perception_msgs::msg::DetectedObjects>(
-    "output/object", rclcpp::QoS{1});
-
   // Parameters
   base_link_frame_id_ = declare_parameter<std::string>("base_link_frame_id", "base_link");
   priority_mode_ = static_cast<PriorityMode>(
     declare_parameter<int>("priority_mode", static_cast<int>(PriorityMode::Confidence)));
+  sync_queue_size_ = declare_parameter<int>("sync_queue_size", 20);
   remove_overlapped_unknown_objects_ =
     declare_parameter<bool>("remove_overlapped_unknown_objects", true);
   overlapped_judge_param_.precision_threshold =
@@ -115,6 +108,24 @@ ObjectAssociationMergerNode::ObjectAssociationMergerNode(const rclcpp::NodeOptio
   const auto min_iou_matrix = this->declare_parameter<std::vector<double>>("min_iou_matrix");
   data_association_ = std::make_unique<DataAssociation>(
     can_assign_matrix, max_dist_matrix, max_rad_matrix, min_iou_matrix);
+
+  // Create publishers and subscribers
+  using std::placeholders::_1;
+  using std::placeholders::_2;
+  sync_ptr_ = std::make_shared<Sync>(SyncPolicy(sync_queue_size_), object0_sub_, object1_sub_);
+  sync_ptr_->registerCallback(
+    std::bind(&ObjectAssociationMergerNode::objectsCallback, this, _1, _2));
+
+  merged_object_pub_ = create_publisher<autoware_auto_perception_msgs::msg::DetectedObjects>(
+    "output/object", rclcpp::QoS{1});
+
+  // Debug publisher
+  processing_time_publisher_ =
+    std::make_unique<tier4_autoware_utils::DebugPublisher>(this, "object_association_merger");
+  stop_watch_ptr_ = std::make_unique<tier4_autoware_utils::StopWatch<std::chrono::milliseconds>>();
+  stop_watch_ptr_->tic("cyclic_time");
+  stop_watch_ptr_->tic("processing_time");
+  published_time_publisher_ = std::make_unique<tier4_autoware_utils::PublishedTimePublisher>(this);
 }
 
 void ObjectAssociationMergerNode::objectsCallback(
@@ -125,6 +136,7 @@ void ObjectAssociationMergerNode::objectsCallback(
   if (merged_object_pub_->get_subscription_count() < 1) {
     return;
   }
+  stop_watch_ptr_->toc("processing_time", true);
 
   /* transform to base_link coordinate */
   autoware_auto_perception_msgs::msg::DetectedObjects transformed_objects0, transformed_objects1;
@@ -212,6 +224,12 @@ void ObjectAssociationMergerNode::objectsCallback(
 
   // publish output msg
   merged_object_pub_->publish(output_msg);
+  published_time_publisher_->publish_if_subscribed(merged_object_pub_, output_msg.header.stamp);
+  // publish processing time
+  processing_time_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+    "debug/cyclic_time_ms", stop_watch_ptr_->toc("cyclic_time", true));
+  processing_time_publisher_->publish<tier4_debug_msgs::msg::Float64Stamped>(
+    "debug/processing_time_ms", stop_watch_ptr_->toc("processing_time", true));
 }
 }  // namespace object_association
 

@@ -43,8 +43,6 @@ namespace behavior_velocity_planner
 
 using autoware_auto_planning_msgs::msg::PathPointWithLaneId;
 using autoware_auto_planning_msgs::msg::PathWithLaneId;
-using tier4_autoware_utils::createPoint;
-using tier4_autoware_utils::Point2d;
 using tier4_planning_msgs::msg::StopFactor;
 
 enum class CollisionState { YIELD, EGO_PASS_FIRST, EGO_PASS_LATER, IGNORE };
@@ -52,6 +50,8 @@ enum class CollisionState { YIELD, EGO_PASS_FIRST, EGO_PASS_LATER, IGNORE };
 struct CollisionPoint
 {
   geometry_msgs::msg::Point collision_point{};
+  std::optional<double> crosswalk_passage_direction{
+    std::nullopt};  // denote obj is passing the crosswalk along the vehicle lane
   double time_to_collision{};
   double time_to_vehicle{};
 };
@@ -84,7 +84,7 @@ struct DebugData
   std::vector<std::vector<geometry_msgs::msg::Point>> obj_polygons;
 };
 
-std::vector<lanelet::ConstLanelet> getCrosswalksOnPath(
+std::vector<std::pair<int64_t, lanelet::ConstLanelet>> getCrosswalksOnPath(
   const geometry_msgs::msg::Pose & current_pose,
   const autoware_auto_planning_msgs::msg::PathWithLaneId & path,
   const lanelet::LaneletMapPtr lanelet_map,
@@ -107,7 +107,7 @@ std::vector<geometry_msgs::msg::Point> getLinestringIntersects(
   const geometry_msgs::msg::Point & ego_pos, const size_t max_num);
 
 std::optional<lanelet::ConstLineString3d> getStopLineFromMap(
-  const int lane_id, const lanelet::LaneletMapPtr & lanelet_map_ptr,
+  const lanelet::Id lane_id, const lanelet::LaneletMapPtr & lanelet_map_ptr,
   const std::string & attribute_name);
 }  // namespace behavior_velocity_planner
 

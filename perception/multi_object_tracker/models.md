@@ -2,6 +2,8 @@
 
 ## Tracking model
 
+<!-- cspell:ignore CTRV -->
+
 ### CTRV model [1]
 
 CTRV model is a model that assumes constant turn rate and velocity magnitude.
@@ -9,21 +11,21 @@ CTRV model is a model that assumes constant turn rate and velocity magnitude.
 - state transition equation
 
 $$
-\begin{align*}
-x_{k+1}   &= x_k + v_{x_k} \cos(\psi_k) \cdot dt \\
-y_{k+1}   &= y_k + v_{x_k} \sin(\psi_k) \cdot dt \\
-\psi_{k+1} &= \psi_k + \dot{\psi}_k \cdot dt \\
-v_{x_{k+1}}  &= v_{x_k} \\
-\dot{\psi}_{k+1}  &= \dot{\psi}_k \\
-\end{align*}
+\begin{aligned}
+x_{k+1} & = x_{k} + v_{k} \cos(\psi_k) \cdot {d t} \\
+y_{k+1} & = y_{k} + v_{k} \sin(\psi_k) \cdot {d t} \\
+\psi_{k+1} & = \psi_k + \dot\psi_{k} \cdot {d t} \\
+v_{k+1} & = v_{k} \\
+\dot\psi_{k+1} & = \dot\psi_{k} \\
+\end{aligned}
 $$
 
 - jacobian
 
 $$
 A = \begin{bmatrix}
-1 & 0 & -v_x \sin(\psi) \cdot dt & \cos(\psi) \cdot dt & 0 \\
-0 & 1 & v_x \cos(\psi) \cdot dt & \sin(\psi) \cdot dt & 0 \\
+1 & 0 & -v \sin(\psi) \cdot dt & \cos(\psi) \cdot dt & 0 \\
+0 & 1 & v \cos(\psi) \cdot dt & \sin(\psi) \cdot dt & 0 \\
 0 & 0 & 1 & 0 & dt \\
 0 & 0 & 0 & 1 & 0 \\
 0 & 0 & 0 & 0 & 1 \\
@@ -38,17 +40,20 @@ The merit of using this model is that it can prevent unintended yaw rotation whe
 ![kinematic_bicycle_model](image/kinematic_bicycle_model.png)
 
 - **state variable**
-  - pose( $x,y$ ), velocity( $v$ ), yaw( $\psi$ ), and slip angle ( $\beta$ )
-  - $[x_{k} ,y_{k} , v_{k} , \psi_{k} , \beta_{k} ]^\mathrm{T}$
+  - pose( $x,y$ ), yaw( $\psi$ ), velocity( $v$ ), and slip angle ( $\beta$ )
+  - $[x_{k}, y_{k}, \psi_{k}, v_{k}, \beta_{k} ]^\mathrm{T}$
 - **Prediction Equation**
   - $dt$: sampling time
+  - $w_{k} = \dot\psi_{k} = \frac{ v_{k} \sin \left( \beta_{k} \right) }{ l_r }$ : angular velocity
 
 $$
 \begin{aligned}
-x_{k+1} & =x_{k}+v_{k} \cos \left(\psi_{k}+\beta_{k}\right) d t \\
-y_{k+1} & =y_{k}+v_{k} \sin \left(\psi_{k}+\beta_{k}\right) d t \\
-v_{k+1} & =v_{k} \\
-\psi_{k+1} & =\psi_{k}+\frac{v_{k}}{l_{r}} \sin \beta_{k} d t \\
+x_{k+1} & = x_{k} + v_{k} \cos \left( \psi_{k}+\beta_{k} \right) {d t}
+            -\frac{1}{2}  \left\lbrace w_k v_k \sin \left(\psi_{k}+\beta_{k} \right) \right\rbrace {d t}^2\\
+y_{k+1} & = y_{k} + v_{k} \sin \left( \psi_{k}+\beta_{k} \right) {d t}
+            +\frac{1}{2}  \left\lbrace w_k v_k \cos \left(\psi_{k}+\beta_{k} \right) \right\rbrace {d t}^2\\
+\psi_{k+1} & =\psi_{k} + w_k {d t} \\
+v_{k+1} & = v_{k} \\
 \beta_{k+1} & =\beta_{k}
 \end{aligned}
 $$
@@ -57,9 +62,15 @@ $$
 
 $$
 \frac{\partial f}{\partial \mathrm x}=\left[\begin{array}{ccccc}
-1 & 0 & -v \sin (\psi+\beta) d t & v \cos (\psi+\beta) & -v \sin (\psi+\beta) d t \\
-0 & 1 & v \cos (\psi+\beta) d t & v \sin (\psi+\beta) & v \cos (\psi+\beta) d t \\
-0 & 0 & 1 & \frac{1}{l_r} \sin \beta d t & \frac{v}{l_r} \cos \beta d t \\
+1 & 0
+ & v \cos (\psi+\beta) {d t} - \frac{1}{2} \left\lbrace w v \cos \left( \psi+\beta \right) \right\rbrace {d t}^2
+ & \sin (\psi+\beta) {d t} - \left\lbrace w \sin \left( \psi+\beta \right) \right\rbrace {d t}^2
+ & -v \sin (\psi+\beta) {d t} - \frac{v^2}{2l_r} \left\lbrace \cos(\beta)\sin(\psi+\beta)+\sin(\beta)\cos(\psi+\beta) \right\rbrace {d t}^2 \\
+0 & 1
+ & v \sin (\psi+\beta) {d t} - \frac{1}{2} \left\lbrace w v \sin \left( \psi+\beta \right) \right\rbrace {d t}^2
+ & \cos (\psi+\beta) {d t} + \left\lbrace w \cos \left( \psi+\beta \right) \right\rbrace {d t}^2
+ & v \cos (\psi+\beta) {d t} + \frac{v^2}{2l_r} \left\lbrace \cos(\beta)\cos(\psi+\beta)-\sin(\beta)\sin(\psi+\beta) \right\rbrace {d t}^2 \\
+0 & 0 & 1 & \frac{1}{l_r} \sin \beta {d t} & \frac{v}{l_r} \cos \beta d t \\
 0 & 0 & 0 & 1 & 0 \\
 0 & 0 & 0 & 0 & 1
 \end{array}\right]
@@ -106,5 +117,10 @@ In other words, the offset value must be adjusted so that the input BBOX and the
 
 ## References
 
-[1] Schubert, Robin & Richter, Eric & Wanielik, Gerd. (2008). Comparison and evaluation of advanced motion models for vehicle tracking. 1 - 6. 10.1109/ICIF.2008.4632283.  
+<!-- cspell:ignore Wanielik, Gerd, ICIF -->
+
+[1] Schubert, Robin & Richter, Eric & Wanielik, Gerd. (2008). Comparison and evaluation of advanced motion models for vehicle tracking. 1 - 6. 10.1109/ICIF.2008.4632283.
+
+<!-- cspell:ignore Pfeiffer, Schildbach, Georg, Borrelli, Francesco -->
+
 [2] Kong, Jason & Pfeiffer, Mark & Schildbach, Georg & Borrelli, Francesco. (2015). Kinematic and dynamic vehicle models for autonomous driving control design. 1094-1099. 10.1109/IVS.2015.7225830.

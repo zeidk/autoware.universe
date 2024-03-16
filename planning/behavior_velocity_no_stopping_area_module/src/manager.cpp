@@ -14,6 +14,7 @@
 
 #include "manager.hpp"
 
+#include <behavior_velocity_planner_common/utilization/util.hpp>
 #include <lanelet2_extension/utility/query.hpp>
 #include <tier4_autoware_utils/ros/parameter.hpp>
 
@@ -34,8 +35,7 @@ using tier4_autoware_utils::getOrDeclareParameter;
 
 NoStoppingAreaModuleManager::NoStoppingAreaModuleManager(rclcpp::Node & node)
 : SceneModuleManagerInterfaceWithRTC(
-    node, getModuleName(),
-    getOrDeclareParameter<bool>(node, std::string(getModuleName()) + ".enable_rtc"))
+    node, getModuleName(), getEnableRTC(node, std::string(getModuleName()) + ".enable_rtc"))
 {
   const std::string ns(getModuleName());
   auto & pp = planner_param_;

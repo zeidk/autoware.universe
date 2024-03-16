@@ -15,9 +15,13 @@
 #ifndef OBSTACLE_CRUISE_PLANNER__COMMON_STRUCTS_HPP_
 #define OBSTACLE_CRUISE_PLANNER__COMMON_STRUCTS_HPP_
 
-#include "motion_utils/motion_utils.hpp"
+#include "motion_utils/trajectory/conversion.hpp"
+#include "motion_utils/trajectory/interpolation.hpp"
+#include "motion_utils/trajectory/trajectory.hpp"
 #include "obstacle_cruise_planner/type_alias.hpp"
-#include "tier4_autoware_utils/tier4_autoware_utils.hpp"
+#include "tier4_autoware_utils/geometry/boost_polygon_utils.hpp"
+#include "tier4_autoware_utils/ros/update_param.hpp"
+#include "tier4_autoware_utils/ros/uuid_helper.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 
@@ -51,7 +55,8 @@ struct Obstacle
 {
   Obstacle(
     const rclcpp::Time & arg_stamp, const PredictedObject & object,
-    const geometry_msgs::msg::Pose & arg_pose)
+    const geometry_msgs::msg::Pose & arg_pose, const double ego_to_obstacle_distance,
+    const double lat_dist_from_obstacle_to_traj)
   : stamp(arg_stamp),
     pose(arg_pose),
     orientation_reliable(true),
@@ -59,7 +64,9 @@ struct Obstacle
     twist_reliable(true),
     classification(object.classification.at(0)),
     uuid(tier4_autoware_utils::toHexString(object.object_id)),
-    shape(object.shape)
+    shape(object.shape),
+    ego_to_obstacle_distance(ego_to_obstacle_distance),
+    lat_dist_from_obstacle_to_traj(lat_dist_from_obstacle_to_traj)
   {
     predicted_paths.clear();
     for (const auto & path : object.kinematics.predicted_paths) {
@@ -78,6 +85,8 @@ struct Obstacle
   std::string uuid;
   Shape shape;
   std::vector<PredictedPath> predicted_paths;
+  double ego_to_obstacle_distance;
+  double lat_dist_from_obstacle_to_traj;
 };
 
 struct TargetObstacleInterface
@@ -104,13 +113,22 @@ struct StopObstacle : public TargetObstacleInterface
 {
   StopObstacle(
     const std::string & arg_uuid, const rclcpp::Time & arg_stamp,
-    const geometry_msgs::msg::Pose & arg_pose, const double arg_lon_velocity,
-    const double arg_lat_velocity, const geometry_msgs::msg::Point arg_collision_point)
+    const geometry_msgs::msg::Pose & arg_pose, const Shape & arg_shape,
+    const double arg_lon_velocity, const double arg_lat_velocity,
+    const geometry_msgs::msg::Point arg_collision_point,
+    const double arg_dist_to_collide_on_decimated_traj)
   : TargetObstacleInterface(arg_uuid, arg_stamp, arg_pose, arg_lon_velocity, arg_lat_velocity),
-    collision_point(arg_collision_point)
+    shape(arg_shape),
+    collision_point(arg_collision_point),
+    dist_to_collide_on_decimated_traj(arg_dist_to_collide_on_decimated_traj)
   {
   }
-  geometry_msgs::msg::Point collision_point;
+  Shape shape;
+  geometry_msgs::msg::Point
+    collision_point;  // TODO(yuki_takagi): this member variable still used in
+                      // calculateMarginFromObstacleOnCurve() and  should be removed as it can be
+                      // replaced by ”dist_to_collide_on_decimated_traj”
+  double dist_to_collide_on_decimated_traj;
 };
 
 struct CruiseObstacle : public TargetObstacleInterface
@@ -130,19 +148,21 @@ struct SlowDownObstacle : public TargetObstacleInterface
 {
   SlowDownObstacle(
     const std::string & arg_uuid, const rclcpp::Time & arg_stamp,
-    const geometry_msgs::msg::Pose & arg_pose, const double arg_lon_velocity,
-    const double arg_lat_velocity, const double arg_precise_lat_dist,
+    const ObjectClassification & object_classification, const geometry_msgs::msg::Pose & arg_pose,
+    const double arg_lon_velocity, const double arg_lat_velocity, const double arg_precise_lat_dist,
     const geometry_msgs::msg::Point & arg_front_collision_point,
     const geometry_msgs::msg::Point & arg_back_collision_point)
   : TargetObstacleInterface(arg_uuid, arg_stamp, arg_pose, arg_lon_velocity, arg_lat_velocity),
     precise_lat_dist(arg_precise_lat_dist),
     front_collision_point(arg_front_collision_point),
-    back_collision_point(arg_back_collision_point)
+    back_collision_point(arg_back_collision_point),
+    classification(object_classification)
   {
   }
   double precise_lat_dist;  // for efficient calculation
   geometry_msgs::msg::Point front_collision_point;
   geometry_msgs::msg::Point back_collision_point;
+  ObjectClassification classification;
 };
 
 struct LongitudinalInfo
@@ -157,6 +177,8 @@ struct LongitudinalInfo
     limit_min_accel = node.declare_parameter<double>("limit.min_acc");
     limit_max_jerk = node.declare_parameter<double>("limit.max_jerk");
     limit_min_jerk = node.declare_parameter<double>("limit.min_jerk");
+    slow_down_min_accel = node.declare_parameter<double>("slow_down.min_acc");
+    slow_down_min_jerk = node.declare_parameter<double>("slow_down.min_jerk");
 
     idling_time = node.declare_parameter<double>("common.idling_time");
     min_ego_accel_for_rss = node.declare_parameter<double>("common.min_ego_accel_for_rss");
@@ -182,6 +204,9 @@ struct LongitudinalInfo
     tier4_autoware_utils::updateParam<double>(parameters, "limit.min_accel", limit_min_accel);
     tier4_autoware_utils::updateParam<double>(parameters, "limit.max_jerk", limit_max_jerk);
     tier4_autoware_utils::updateParam<double>(parameters, "limit.min_jerk", limit_min_jerk);
+    tier4_autoware_utils::updateParam<double>(
+      parameters, "slow_down.min_accel", slow_down_min_accel);
+    tier4_autoware_utils::updateParam<double>(parameters, "slow_down.min_jerk", slow_down_min_jerk);
 
     tier4_autoware_utils::updateParam<double>(parameters, "common.idling_time", idling_time);
     tier4_autoware_utils::updateParam<double>(
@@ -205,6 +230,8 @@ struct LongitudinalInfo
   double min_accel;
   double max_jerk;
   double min_jerk;
+  double slow_down_min_jerk;
+  double slow_down_min_accel;
   double limit_max_accel;
   double limit_min_accel;
   double limit_max_jerk;

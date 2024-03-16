@@ -32,7 +32,8 @@
 
 #include "freespace_planning_algorithms/abstract_algorithm.hpp"
 
-#include <tier4_autoware_utils/tier4_autoware_utils.hpp>
+#include <motion_utils/trajectory/trajectory.hpp>
+#include <tier4_autoware_utils/geometry/geometry.hpp>
 
 #include <algorithm>
 #include <deque>
@@ -284,6 +285,8 @@ FreespacePlannerNode::FreespacePlannerNode(const rclcpp::NodeOptions & node_opti
     timer_ = rclcpp::create_timer(
       this, get_clock(), period_ns, std::bind(&FreespacePlannerNode::onTimer, this));
   }
+
+  logger_configure_ = std::make_unique<tier4_autoware_utils::LoggerLevelConfigure>(this);
 }
 
 PlannerCommonParam FreespacePlannerNode::getPlannerCommonParam()
@@ -369,7 +372,7 @@ bool FreespacePlannerNode::isPlanRequired()
     const bool is_obstacle_found =
       algo_->hasObstacleOnTrajectory(trajectory2PoseArray(forward_trajectory));
     if (is_obstacle_found) {
-      RCLCPP_INFO(get_logger(), "Found obstacle");
+      RCLCPP_DEBUG(get_logger(), "Found obstacle");
       return true;
     }
   }
@@ -490,10 +493,10 @@ void FreespacePlannerNode::planTrajectory()
   const bool result = algo_->makePlan(current_pose_in_costmap_frame, goal_pose_in_costmap_frame);
   const rclcpp::Time end = get_clock()->now();
 
-  RCLCPP_INFO(get_logger(), "Freespace planning: %f [s]", (end - start).seconds());
+  RCLCPP_DEBUG(get_logger(), "Freespace planning: %f [s]", (end - start).seconds());
 
   if (result) {
-    RCLCPP_INFO(get_logger(), "Found goal!");
+    RCLCPP_DEBUG(get_logger(), "Found goal!");
     trajectory_ =
       createTrajectory(current_pose_, algo_->getWaypoints(), node_param_.waypoints_velocity);
     reversing_indices_ = getReversingIndices(trajectory_);

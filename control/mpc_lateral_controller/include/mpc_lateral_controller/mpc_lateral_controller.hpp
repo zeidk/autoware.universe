@@ -91,7 +91,7 @@ private:
   // trajectory buffer for detecting new trajectory
   std::deque<Trajectory> m_trajectory_buffer;
 
-  MPC m_mpc;  // MPC object for trajectory following.
+  std::unique_ptr<MPC> m_mpc;  // MPC object for trajectory following.
 
   // Check is mpc output converged
   bool m_is_mpc_history_filled{false};
@@ -187,7 +187,7 @@ private:
    * @brief Set the current trajectory using the received message.
    * @param msg Received trajectory message.
    */
-  void setTrajectory(const Trajectory & msg);
+  void setTrajectory(const Trajectory & msg, const Odometry & current_kinematics);
 
   /**
    * @brief Check if the received data is valid.

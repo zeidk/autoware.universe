@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "radar_fusion_to_detected_object.hpp"
+#include "radar_fusion_to_detected_object/radar_fusion_to_detected_object.hpp"
 
 #include <tier4_autoware_utils/geometry/geometry.hpp>
 #include <tier4_autoware_utils/math/normalization.hpp>
@@ -296,7 +296,7 @@ TwistWithCovariance RadarFusionToDetectedObject::estimateTwist(
 bool RadarFusionToDetectedObject::isQualified(
   const DetectedObject & object, std::shared_ptr<std::vector<RadarInput>> & radars)
 {
-  if (object.classification[0].probability > param_.threshold_probability) {
+  if (object.existence_probability > param_.threshold_probability) {
     return true;
   } else {
     if (!radars || !(*radars).empty()) {

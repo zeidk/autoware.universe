@@ -14,9 +14,10 @@
 
 #include "obstacle_avoidance_planner/replan_checker.hpp"
 
-#include "motion_utils/motion_utils.hpp"
+#include "motion_utils/trajectory/trajectory.hpp"
 #include "obstacle_avoidance_planner/utils/trajectory_utils.hpp"
-#include "tier4_autoware_utils/tier4_autoware_utils.hpp"
+#include "tier4_autoware_utils/geometry/geometry.hpp"
+#include "tier4_autoware_utils/ros/update_param.hpp"
 
 #include <vector>
 
@@ -64,14 +65,14 @@ bool ReplanChecker::isResetRequired(const PlannerData & planner_data) const
 
     // path shape changes
     if (isPathAroundEgoChanged(planner_data, prev_traj_points)) {
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         logger_, "Replan with resetting optimization since path shape around ego changed.");
       return true;
     }
 
     // path goal changes
     if (isPathGoalChanged(planner_data, prev_traj_points)) {
-      RCLCPP_INFO(logger_, "Replan with resetting optimization since path goal changed.");
+      RCLCPP_DEBUG(logger_, "Replan with resetting optimization since path goal changed.");
       return true;
     }
 
@@ -79,7 +80,7 @@ bool ReplanChecker::isResetRequired(const PlannerData & planner_data) const
     const double delta_dist =
       tier4_autoware_utils::calcDistance2d(p.ego_pose, prev_ego_pose_ptr_->position);
     if (max_ego_moving_dist_ < delta_dist) {
-      RCLCPP_INFO(
+      RCLCPP_DEBUG(
         logger_,
         "Replan with resetting optimization since current ego pose is far from previous ego pose.");
       return true;

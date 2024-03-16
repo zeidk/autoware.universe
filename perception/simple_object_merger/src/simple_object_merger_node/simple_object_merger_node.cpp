@@ -80,9 +80,9 @@ SimpleObjectMergerNode::SimpleObjectMergerNode(const rclcpp::NodeOptions & node_
     std::bind(&SimpleObjectMergerNode::onSetParam, this, std::placeholders::_1));
 
   // Node Parameter
-  node_param_.update_rate_hz = declare_parameter<double>("update_rate_hz", 20.0);
-  node_param_.new_frame_id = declare_parameter<std::string>("new_frame_id", "base_link");
-  node_param_.timeout_threshold = declare_parameter<double>("timeout_threshold", 1.0);
+  node_param_.update_rate_hz = declare_parameter<double>("update_rate_hz");
+  node_param_.new_frame_id = declare_parameter<std::string>("new_frame_id");
+  node_param_.timeout_threshold = declare_parameter<double>("timeout_threshold");
 
   declare_parameter("input_topics", std::vector<std::string>());
   node_param_.topic_names = get_parameter("input_topics").as_string_array();
@@ -170,7 +170,7 @@ void SimpleObjectMergerNode::onTimer()
   output_objects.header.frame_id = node_param_.new_frame_id;
 
   for (size_t i = 0; i < input_topic_size; i++) {
-    double time_diff = (this->get_clock()->now()).seconds() -
+    double time_diff = rclcpp::Time(objects_data_.at(i)->header.stamp).seconds() -
                        rclcpp::Time(objects_data_.at(0)->header.stamp).seconds();
     if (std::abs(time_diff) < node_param_.timeout_threshold) {
       transform_ = transform_listener_->getTransform(

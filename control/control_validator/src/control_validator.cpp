@@ -16,9 +16,6 @@
 
 #include "control_validator/utils.hpp"
 
-#include <motion_utils/motion_utils.hpp>
-#include <tier4_autoware_utils/tier4_autoware_utils.hpp>
-
 #include <memory>
 #include <string>
 #include <utility>
@@ -49,14 +46,11 @@ ControlValidator::ControlValidator(const rclcpp::NodeOptions & options)
 
   setupParameters();
 
-  if (publish_diag_) {
-    setupDiag();
-  }
+  setupDiag();
 }
 
 void ControlValidator::setupParameters()
 {
-  publish_diag_ = declare_parameter<bool>("publish_diag");
   diag_error_count_threshold_ = declare_parameter<int>("diag_error_count_threshold");
   display_on_terminal_ = declare_parameter<bool>("display_on_terminal");
 
@@ -124,6 +118,11 @@ bool ControlValidator::isDataReady()
 
 void ControlValidator::onReferenceTrajectory(const Trajectory::ConstSharedPtr msg)
 {
+  if (msg->points.size() < 2) {
+    RCLCPP_ERROR(get_logger(), "planning trajectory size is invalid (%lu)", msg->points.size());
+    return;
+  }
+
   current_reference_trajectory_ = msg;
 
   return;
@@ -163,7 +162,9 @@ void ControlValidator::publishDebugInfo()
 void ControlValidator::validate(const Trajectory & predicted_trajectory)
 {
   if (predicted_trajectory.points.size() < 2) {
-    RCLCPP_ERROR(get_logger(), "predicted_trajectory size is less than 2. Cannot validate.");
+    RCLCPP_ERROR_THROTTLE(
+      get_logger(), *get_clock(), 1000,
+      "predicted_trajectory size is less than 2. Cannot validate.");
     return;
   }
 

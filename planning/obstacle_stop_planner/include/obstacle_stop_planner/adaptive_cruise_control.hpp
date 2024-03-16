@@ -16,7 +16,6 @@
 #define OBSTACLE_STOP_PLANNER__ADAPTIVE_CRUISE_CONTROL_HPP_
 
 #include <rclcpp/rclcpp.hpp>
-#include <tier4_autoware_utils/tier4_autoware_utils.hpp>
 
 #include <autoware_auto_perception_msgs/msg/predicted_objects.hpp>
 #include <autoware_auto_planning_msgs/msg/trajectory.hpp>
@@ -27,6 +26,7 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <tf2/utils.h>
 
+#include <optional>
 #include <vector>
 
 namespace motion_planning
@@ -191,12 +191,12 @@ private:
     const rclcpp::Time & nearest_collision_point_time, double * distance,
     const std_msgs::msg::Header & trajectory_header);
   double calcTrajYaw(const TrajectoryPoints & trajectory, const int collision_point_idx);
-  bool estimatePointVelocityFromObject(
+  std::optional<double> estimatePointVelocityFromObject(
     const autoware_auto_perception_msgs::msg::PredictedObjects::ConstSharedPtr object_ptr,
-    const double traj_yaw, const pcl::PointXYZ & nearest_collision_point, double * velocity);
-  bool estimatePointVelocityFromPcl(
+    const double traj_yaw, const pcl::PointXYZ & nearest_collision_point);
+  std::optional<double> estimatePointVelocityFromPcl(
     const double traj_yaw, const pcl::PointXYZ & nearest_collision_point,
-    const rclcpp::Time & nearest_collision_point_time, double * velocity);
+    const rclcpp::Time & nearest_collision_point_time);
   void calculateProjectedVelocityFromObject(
     const PredictedObject & object, const double traj_yaw, double * velocity);
   double estimateRoughPointVelocity(double current_vel);

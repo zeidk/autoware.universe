@@ -14,6 +14,7 @@
 
 #include "manager.hpp"
 
+#include <behavior_velocity_planner_common/utilization/util.hpp>
 #include <tier4_autoware_utils/ros/parameter.hpp>
 
 #include <tf2/utils.h>
@@ -22,9 +23,7 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <unordered_map>
 #include <utility>
-
 namespace behavior_velocity_planner
 {
 using lanelet::TrafficLight;
@@ -32,12 +31,13 @@ using tier4_autoware_utils::getOrDeclareParameter;
 
 TrafficLightModuleManager::TrafficLightModuleManager(rclcpp::Node & node)
 : SceneModuleManagerInterfaceWithRTC(
-    node, getModuleName(),
-    getOrDeclareParameter<bool>(node, std::string(getModuleName()) + ".enable_rtc"))
+    node, getModuleName(), getEnableRTC(node, std::string(getModuleName()) + ".enable_rtc"))
 {
   const std::string ns(getModuleName());
   planner_param_.stop_margin = getOrDeclareParameter<double>(node, ns + ".stop_margin");
   planner_param_.tl_state_timeout = getOrDeclareParameter<double>(node, ns + ".tl_state_timeout");
+  planner_param_.stop_time_hysteresis =
+    getOrDeclareParameter<double>(node, ns + ".stop_time_hysteresis");
   planner_param_.enable_pass_judge = getOrDeclareParameter<bool>(node, ns + ".enable_pass_judge");
   planner_param_.yellow_lamp_period =
     getOrDeclareParameter<double>(node, ns + ".yellow_lamp_period");
@@ -73,7 +73,7 @@ void TrafficLightModuleManager::modifyPathVelocity(
 
     // The velocity factor must be called after modifyPathVelocity.
     const auto velocity_factor = traffic_light_scene_module->getVelocityFactor();
-    if (velocity_factor.type != VelocityFactor::UNKNOWN) {
+    if (velocity_factor.behavior != PlanningBehavior::UNKNOWN) {
       velocity_factor_array.factors.emplace_back(velocity_factor);
     }
     if (stop_reason.reason != "") {

@@ -14,7 +14,8 @@
 
 #include "radar_crossing_objects_noise_filter/radar_crossing_objects_noise_filter_node.hpp"
 
-#include "tier4_autoware_utils/tier4_autoware_utils.hpp"
+#include "tier4_autoware_utils/geometry/geometry.hpp"
+#include "tier4_autoware_utils/math/normalization.hpp"
 
 #include <tf2/utils.h>
 
@@ -63,8 +64,8 @@ RadarCrossingObjectsNoiseFilterNode::RadarCrossingObjectsNoiseFilterNode(
     std::bind(&RadarCrossingObjectsNoiseFilterNode::onSetParam, this, std::placeholders::_1));
 
   // Node Parameter
-  node_param_.angle_threshold = declare_parameter<double>("angle_threshold", 1.0472);
-  node_param_.velocity_threshold = declare_parameter<double>("velocity_threshold", 3.0);
+  node_param_.angle_threshold = declare_parameter<double>("angle_threshold");
+  node_param_.velocity_threshold = declare_parameter<double>("velocity_threshold");
 
   // Subscriber
   sub_objects_ = create_subscription<DetectedObjects>(
