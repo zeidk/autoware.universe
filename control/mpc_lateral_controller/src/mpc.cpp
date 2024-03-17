@@ -21,7 +21,11 @@
 #include "tier4_autoware_utils/math/unit_conversion.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
 #include <limits>
+#include <memory>
 
 namespace autoware::motion::control::mpc_lateral_controller
 {
@@ -78,7 +82,30 @@ bool MPC::calculateMPC(
   bool success_opt;
   VectorXd Uex;
   MPCMatrix mpc_matrix;
+
+  for (Eigen::Index i = 0; i < x0_delayed.size(); ++i) {
+    std::cerr << "x0_delayed: " << x0_delayed(i) << std::endl;
+  }
+
   if (qp_solver_type == "cgmres") {
+    const double elapsed_time_ms =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::system_clock::now() - m_previous_optimal_solution_time)
+        .count() *
+      1.0e-6;
+    std::cerr << "time from last optimal solution [ms]: " << elapsed_time_ms << std::endl;
+    if (0 < elapsed_time_ms && elapsed_time_ms < 50.0) {
+      std::cerr << "skip optimization" << std::endl;
+      // std::tie(success_opt, Uex) = executeOptimization(
+      //   x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+      //   current_kinematics.twist.twist.linear.x);
+    } else {
+      RCLCPP_INFO(m_logger, "execute optimization without warm start (CGMRES)");
+      std::tie(success_opt, Uex) = executeOptimization(
+        x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+        current_kinematics.twist.twist.linear.x);
+    }
+
     // const auto & u = mpc.uopt()[0];  // const reference to the initial optimal control input
     // mpc.update(t, x);                // update the MPC solution
 
@@ -97,7 +124,12 @@ bool MPC::calculateMPC(
       mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
       current_kinematics.twist.twist.linear.x);
   }
-  if (!success_opt) {
+  if (success_opt) {
+    m_previous_optimal_solution_time = std::chrono::system_clock::now();
+    // auto now_c = std::chrono::system_clock::to_time_t(m_previous_optimal_solution_time);
+    // std::cerr << "Current time: " << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S")
+    //           << std::endl;
+  } else {
     return fail_warn_throttle("optimization failed. Stop MPC.");
   }
 
@@ -614,6 +646,83 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   {
     auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
     RCLCPP_DEBUG(m_logger, "qp solver calculation time = %ld [ms]", t);
+  }
+
+  if (Uex.array().isNaN().any()) {
+    warn_throttle("model Uex includes NaN, stop MPC.");
+    return {false, {}};
+  }
+  return {true, Uex};
+}
+
+/*
+ * solve quadratic optimization.
+ * cost function: J = Xex' * Qex * Xex + (Uex - Uref)' * R1ex * (Uex - Uref_ex) + Uex' * R2ex * Uex
+ *                , Qex = diag([Q,Q,...]), R1ex = diag([R,R,...])
+ * constraint matrix : lb < U < ub, lbA < A*U < ubA
+ * current considered constraint
+ *  - steering limit
+ *  - steering rate limit
+ *
+ * (1)lb < u < ub && (2)lbA < Au < ubA --> (3)[lb, lbA] < [I, A]u < [ub, ubA]
+ * (1)lb < u < ub ...
+ * [-u_lim] < [ u0 ] < [u_lim]
+ * [-u_lim] < [ u1 ] < [u_lim]
+ *              ~~~
+ * [-u_lim] < [ uN ] < [u_lim] (*N... DIM_U)
+ * (2)lbA < Au < ubA ...
+ * [prev_u0 - au_lim*ctp] < [   u0  ] < [prev_u0 + au_lim*ctp] (*ctp ... ctrl_period)
+ * [    -au_lim * dt    ] < [u1 - u0] < [     au_lim * dt    ]
+ * [    -au_lim * dt    ] < [u2 - u1] < [     au_lim * dt    ]
+ *                            ~~~
+ * [    -au_lim * dt    ] < [uN-uN-1] < [     au_lim * dt    ] (*N... DIM_U)
+ */
+std::pair<bool, VectorXd> MPC::executeOptimization(
+  const VectorXd & x0, const double prediction_dt, const MPCTrajectory & traj,
+  const double current_velocity)
+{
+  VectorXd Uex;
+
+  // const int N = m_param.prediction_horizon;
+  const double DT = prediction_dt;
+  // const int DIM_X = m_vehicle_model_ptr->getDimX();
+  // const int DIM_U = m_vehicle_model_ptr->getDimU();
+  // const int DIM_Y = m_vehicle_model_ptr->getDimY();
+  // const int DIM_U_N = m_param.prediction_horizon * m_vehicle_model_ptr->getDimU();
+
+  // // Define the horizon.
+  // const double alpha = 0.0;
+  // cgmres::Horizon horizon(prediction_dt, alpha);
+
+  // // Define the solver settings.
+  // cgmres::SolverSettings settings;
+  // settings.sampling_time = 0.001;  // sampling period
+  // settings.zeta = 1000;
+  // settings.finite_difference_epsilon = 1e-08;
+  // // For initialization.
+  // settings.max_iter = 50;
+  // settings.opterr_tol = 1e-06;
+
+  auto t_start = std::chrono::system_clock::now();
+  // m_qpsolver_ptr が QPSolverCGMRES 型のインスタンスを指しているかチェック
+  QPSolverCGMRES * cgmres_solver = dynamic_cast<QPSolverCGMRES *>(m_qpsolver_ptr.get());
+  if (cgmres_solver != nullptr) {
+    // m_qpsolver_ptr が QPSolverCGMRES のインスタンスを指している場合
+    // solveCGMRES メソッドを実行
+    cgmres_solver->solveCGMRES(x0, DT, Uex);
+  } else {
+    std::cout << "The solver is not QPSolverCGMRES." << std::endl;
+  }
+  // bool solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex);
+  auto t_end = std::chrono::system_clock::now();
+  if (!solve_result) {
+    warn_throttle("qp solver error");
+    return {false, {}};
+  }
+
+  {
+    auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+    RCLCPP_DEBUG(m_logger, "cgmres solver calculation time = %ld [ms]", t);
   }
 
   if (Uex.array().isNaN().any()) {
