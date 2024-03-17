@@ -14,6 +14,7 @@
 
 #include "behavior_path_start_planner_module/start_planner_module.hpp"
 
+#include "behavior_path_planner_common/marker_utils/colors.hpp"
 #include "behavior_path_planner_common/utils/parking_departure/utils.hpp"
 #include "behavior_path_planner_common/utils/path_safety_checker/objects_filtering.hpp"
 #include "behavior_path_planner_common/utils/path_utils.hpp"
@@ -1674,16 +1675,16 @@ void StartPlannerModule::setDebugData()
       visualization_msgs::msg::Marker::TEXT_VIEW_FACING, createMarkerScale(0.0, 0.0, 1.0), color);
     marker.pose = status_.pull_out_start_pose;
 
-    if (!status_.is_safe_static_objects) {
+    if (!status_.found_pull_out_path) {
       marker.text = "Cannot engage because no avoidable path against static objects is found.";
       marker.lifetime = life_time;
       engage_is_blocked.markers.push_back(marker);
-      add(engage_is_blocked);
+      add(engage_is_blocked, debug_marker_);
     } else if (!status_.is_safe_dynamic_objects) {
       marker.text = "Cannot engage because a collision with dynamic objects is detected.";
       marker.lifetime = life_time;
       engage_is_blocked.markers.push_back(marker);
-      add(engage_is_blocked);
+      add(engage_is_blocked, debug_marker_);
     }
   }
 }

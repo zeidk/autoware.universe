@@ -26,6 +26,10 @@ ament_auto_add_library(${MPC_LAT_CON_LIB} SHARED
 )
 target_link_libraries(${MPC_LAT_CON_LIB} steering_offset_lib)
 
+target_compile_options(${MPC_LAT_CON_LIB} PRIVATE
+  -Wno-unused-parameter
+)
+
 if(BUILD_TESTING)
   set(TEST_LAT_SOURCES
     test/test_mpc.cpp

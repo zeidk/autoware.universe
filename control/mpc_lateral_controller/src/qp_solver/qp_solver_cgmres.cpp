@@ -14,6 +14,11 @@
 
 #include "mpc_lateral_controller/qp_solver/qp_solver_cgmres.hpp"
 
+#include "cgmres/horizon.hpp"
+#include "cgmres/solver_settings.hpp"
+#include "cgmres/zero_horizon_ocp_solver.hpp"
+#include "mpc_lateral_controller/mpc_cgmres.hpp"
+
 #include <string>
 #include <vector>
 
@@ -21,6 +26,52 @@ namespace autoware::motion::control::mpc_lateral_controller
 {
 QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
 {
+  // Define the optimal control problem.
+  cgmres::OCP_lateral_control ocp;
+
+  // Define the horizon.
+  const double Tf = 2.0;
+  const double alpha = 0.0;
+  cgmres::Horizon horizon(Tf, alpha);
+
+  // Define the solver settings.
+  cgmres::SolverSettings settings;
+  settings.sampling_time = 0.001;  // sampling period
+  settings.zeta = 1000;
+  settings.finite_difference_epsilon = 1e-08;
+  // For initialization.
+  settings.max_iter = 50;
+  settings.opterr_tol = 1e-06;
+
+  // Define the initial time and initial state.
+  // state は 横偏差、ヨー角、ステアリング角度の3つ
+  // const double t0 = 0;
+  cgmres::Vector<3> x0;
+  x0 << 0, 0, 0;
+
+  // Initialize the solution of the C/GMRES method.
+  constexpr int kmax_init = 1;
+  cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer(ocp, settings);
+  cgmres::Vector<1> uc0;
+  uc0 << 0.0;  // 初期値
+  initializer.set_uc(uc0);
+  initializer.solve(t0, x0);
+
+  // Define the C/GMRES solver.
+  constexpr int N = 100;
+  constexpr int kmax = 5;
+  cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc(
+    ocp, horizon, settings);
+  mpc.set_uc(initializer.ucopt());
+  mpc.init_dummy_mu();
+  // Perform a numerical simulation.
+  const double tsim = 10;
+  const double sampling_time = settings.sampling_time;
+  const unsigned int sim_steps = std::floor(tsim / sampling_time);
+
+  double t = t0;
+  cgmres::VectorX x = x0;
+  cgmres::VectorX dx = cgmres::VectorX::Zero(x0.size());
 }
 bool QPSolverCGMRES::solve(
   const Eigen::MatrixXd & h_mat, const Eigen::MatrixXd & f_vec, const Eigen::MatrixXd & a,

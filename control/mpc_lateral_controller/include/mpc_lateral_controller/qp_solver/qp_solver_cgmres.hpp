@@ -60,6 +60,7 @@ public:
 private:
   autoware::common::osqp::OSQPInterface cgmressolver_;
   rclcpp::Logger logger_;
+  bool is_initialized_ = false;
 };
 }  // namespace autoware::motion::control::mpc_lateral_controller
 #endif  // MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_CGMRES_HPP_
