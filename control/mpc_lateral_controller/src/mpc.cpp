@@ -79,11 +79,11 @@ bool MPC::calculateMPC(
   VectorXd Uex;
   MPCMatrix mpc_matrix;
   if (qp_solver_type == "cgmres") {
-    const auto & u = mpc.uopt()[0];  // const reference to the initial optimal control input
-    mpc.update(t, x);                // update the MPC solution
+    // const auto & u = mpc.uopt()[0];  // const reference to the initial optimal control input
+    // mpc.update(t, x);                // update the MPC solution
 
-    mpc.optError(t, x, settings.verbose_level);  // compute the optimal error
-    logger.save(t, x, u, mpc.uopt(), mpc.optError(), mpc.normDiff(), mpc.StandardDeviation());
+    // mpc.optError(t, x, settings.verbose_level);  // compute the optimal error
+    // logger.save(t, x, u, mpc.uopt(), mpc.optError(), mpc.normDiff(), mpc.StandardDeviation());
 
     success_opt = false;
     Uex = VectorXd::Zero(1);

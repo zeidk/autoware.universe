@@ -15,6 +15,7 @@
 #include "mpc_lateral_controller/qp_solver/qp_solver_cgmres.hpp"
 
 #include "cgmres/horizon.hpp"
+#include "cgmres/single_shooting_cgmres_solver.hpp"
 #include "cgmres/solver_settings.hpp"
 #include "cgmres/zero_horizon_ocp_solver.hpp"
 #include "mpc_lateral_controller/mpc_cgmres.hpp"
@@ -45,7 +46,7 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
 
   // Define the initial time and initial state.
   // state は 横偏差、ヨー角、ステアリング角度の3つ
-  // const double t0 = 0;
+  const double t0 = 0;
   cgmres::Vector<3> x0;
   x0 << 0, 0, 0;
 
@@ -65,11 +66,11 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
   mpc.set_uc(initializer.ucopt());
   mpc.init_dummy_mu();
   // Perform a numerical simulation.
-  const double tsim = 10;
-  const double sampling_time = settings.sampling_time;
-  const unsigned int sim_steps = std::floor(tsim / sampling_time);
+  // const double tsim = 10;
+  // const double sampling_time = settings.sampling_time;
+  // const unsigned int sim_steps = std::floor(tsim / sampling_time);
 
-  double t = t0;
+  // double t = t0;
   cgmres::VectorX x = x0;
   cgmres::VectorX dx = cgmres::VectorX::Zero(x0.size());
 }
