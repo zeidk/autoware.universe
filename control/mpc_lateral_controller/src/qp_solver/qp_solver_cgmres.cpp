@@ -77,6 +77,7 @@ bool QPSolverCGMRES::solveCGMRES(
   initializer.solve(t0, x);
   initializer.ucopt();
   u = initializer.uopt();
+  RCLCPP_DEBUG(logger_, "u = %f", u(0));
   return true;
 }
 

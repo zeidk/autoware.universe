@@ -95,12 +95,13 @@ bool MPC::calculateMPC(
       1.0e-6;
     std::cerr << "time from last optimal solution [ms]: " << elapsed_time_ms << std::endl;
     if (0 < elapsed_time_ms && elapsed_time_ms < 50.0) {
-      std::cerr << "skip optimization" << std::endl;
+      RCLCPP_DEBUG(m_logger, "execute optimization with warm start (CGMRES)");
+
       // std::tie(success_opt, Uex) = executeOptimization(
       //   x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
       //   current_kinematics.twist.twist.linear.x);
     } else {
-      RCLCPP_INFO(m_logger, "execute optimization without warm start (CGMRES)");
+      RCLCPP_DEBUG(m_logger, "execute optimization without warm start (CGMRES)");
       std::tie(success_opt, Uex) = executeOptimization(
         x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
         current_kinematics.twist.twist.linear.x);
