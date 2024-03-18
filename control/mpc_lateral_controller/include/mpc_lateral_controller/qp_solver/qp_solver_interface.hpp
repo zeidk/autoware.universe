@@ -46,6 +46,24 @@ public:
     const Eigen::VectorXd & lb, const Eigen::VectorXd & ub, const Eigen::VectorXd & lb_a,
     const Eigen::VectorXd & ub_a, Eigen::VectorXd & u) = 0;
 
+  /**
+   * @brief solve QP problem : minimize J = u' * h_mat * u + f_vec' * u without constraint
+   * @param [in] h_mat parameter matrix in object function
+   * @param [in] f_vec parameter matrix in object function
+   * @param [in] a parameter matrix for constraint lb_a < a*u < ub_a
+   * @param [in] lb parameter matrix for constraint lb < u < ub
+   * @param [in] ub parameter matrix for constraint lb < u < ub
+   * @param [in] lb_a parameter matrix for constraint lb_a < a*u < ub_a
+   * @param [in] ub_a parameter matrix for constraint lb_a < a*u < ub_a
+   * @param [out] u optimal variable vector
+   * @return true if the problem was solved
+   */
+  virtual bool solveCGMRES(
+    const Eigen::VectorXd & /* x0 */, const double /*prediction_dt */, Eigen::VectorXd & /*u*/)
+  {
+    return false;
+  }
+
   virtual int64_t getTakenIter() const { return 0; }
   virtual double getRunTime() const { return 0.0; }
   virtual double getObjVal() const { return 0.0; }

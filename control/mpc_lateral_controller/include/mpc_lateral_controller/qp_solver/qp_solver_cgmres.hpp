@@ -54,7 +54,8 @@ public:
     const Eigen::MatrixXd & h_mat, const Eigen::MatrixXd & f_vec, const Eigen::MatrixXd & a,
     const Eigen::VectorXd & lb, const Eigen::VectorXd & ub, const Eigen::VectorXd & lb_a,
     const Eigen::VectorXd & ub_a, Eigen::VectorXd & u) override;
-  bool solveCGMRES(const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u);
+  bool solveCGMRES(
+    const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u) override;
 
   int64_t getTakenIter() const override { return cgmressolver_.getTakenIter(); }
   double getRunTime() const override { return cgmressolver_.getRunTime(); }

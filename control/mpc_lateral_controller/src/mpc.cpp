@@ -704,16 +704,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   // settings.opterr_tol = 1e-06;
 
   auto t_start = std::chrono::system_clock::now();
-  // m_qpsolver_ptr が QPSolverCGMRES 型のインスタンスを指しているかチェック
-  QPSolverCGMRES * cgmres_solver = dynamic_cast<QPSolverCGMRES *>(m_qpsolver_ptr.get());
-  if (cgmres_solver != nullptr) {
-    // m_qpsolver_ptr が QPSolverCGMRES のインスタンスを指している場合
-    // solveCGMRES メソッドを実行
-    cgmres_solver->solveCGMRES(x0, DT, Uex);
-  } else {
-    std::cout << "The solver is not QPSolverCGMRES." << std::endl;
-  }
-  // bool solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex);
+  bool solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex);
   auto t_end = std::chrono::system_clock::now();
   if (!solve_result) {
     warn_throttle("qp solver error");
