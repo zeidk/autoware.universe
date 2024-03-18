@@ -216,6 +216,7 @@ void calcTrajectoryCurvature(
   MPCTrajectory & traj)
 {
   traj.k = calcTrajectoryCurvature(curvature_smoothing_num_traj, traj);
+
   traj.smooth_k = calcTrajectoryCurvature(curvature_smoothing_num_ref_steer, traj);
 }
 

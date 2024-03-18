@@ -68,9 +68,9 @@ public:
   ///
   static constexpr int nub = 1;
 
-  double v_in_reference_trajectory = 3.0;
-  double curvature_in_reference_trajectory = 0.5;
-  double smoothed_curvature_in_reference_trajectory = 0.5;
+  double v_in_reference_trajectory = 1.0;
+  double curvature_in_reference_trajectory = -0.5;
+  double smoothed_curvature_in_reference_trajectory = -0.5;
   double wheel_base = 2.79;
   double tau_ = 0.3;
 

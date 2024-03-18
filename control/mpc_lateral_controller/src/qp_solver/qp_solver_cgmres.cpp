@@ -34,21 +34,7 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
   // For initialization.
   settings_.max_iter = 50;
   settings_.opterr_tol = 1e-06;
-
-  // Define the initial time and initial state.
-  // state は 横偏差、ヨー角、ステアリング角度の3つ
-  // const double t0 = 0;
-
-  // mpc.set_uc(initializer.ucopt());
-  // mpc.init_dummy_mu();
-  // Perform a numerical simulation.
-  // const double tsim = 10;
-  // const double sampling_time = settings.sampling_time;
-  // const unsigned int sim_steps = std::floor(tsim / sampling_time);
-
-  // double t = t0;
-  // cgmres::VectorX x = x0;
-  // cgmres::VectorX dx = cgmres::VectorX::Zero(x0.size());
+  settings_.verbose_level = 2;
 }
 
 bool QPSolverCGMRES::solveCGMRES(
@@ -59,24 +45,27 @@ bool QPSolverCGMRES::solveCGMRES(
   cgmres::Horizon horizon(prediction_dt, alpha);
 
   // Define the C/GMRES solver.
-  constexpr int N = 100;
+  constexpr int N = 50;
   constexpr int kmax = 5;
   cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc(
     ocp_, horizon, settings_);
 
+  // Define the initial time and initial state.
+  // state は 横偏差、ヨー角、ステアリング角度の3つ
   cgmres::Vector<3> x;
   x << x0(0), x0(1), x0(2);
 
   // Initialize the solution of the C/GMRES method.
-  constexpr int kmax_init = 1;
+  constexpr int kmax_init = 10;
   cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer(ocp_, settings_);
   cgmres::Vector<1> uc0;
-  uc0 << 0.0;  // 初期値
+  uc0 << 0.0;
   initializer.set_uc(uc0);
   const double t0 = 0.0;
   initializer.solve(t0, x);
-  initializer.ucopt();
+  // const double ucopt = initializer.ucopt();
   u = initializer.uopt();
+  // RCLCPP_DEBUG(logger_, "ucopt = %f", ucopt);
   RCLCPP_DEBUG(logger_, "u = %f", u(0));
   return true;
 }

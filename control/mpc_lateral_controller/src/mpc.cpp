@@ -683,19 +683,18 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   const double current_velocity)
 {
   VectorXd Uex;
+  std::cerr << "current_velocity: " << current_velocity << std::endl;
 
-  // const int N = m_param.prediction_horizon;
+  const int N = m_param.prediction_horizon;
+  RCLCPP_DEBUG(m_logger, "N = %d", N);
   const double DT = prediction_dt;
+
   // const int DIM_X = m_vehicle_model_ptr->getDimX();
   // const int DIM_U = m_vehicle_model_ptr->getDimU();
   // const int DIM_Y = m_vehicle_model_ptr->getDimY();
   // const int DIM_U_N = m_param.prediction_horizon * m_vehicle_model_ptr->getDimU();
 
-  // // Define the horizon.
-  // const double alpha = 0.0;
-  // cgmres::Horizon horizon(prediction_dt, alpha);
-
-  // // Define the solver settings.
+  // Define the solver settings.
   // cgmres::SolverSettings settings;
   // settings.sampling_time = 0.001;  // sampling period
   // settings.zeta = 1000;
