@@ -683,10 +683,8 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   const double current_velocity)
 {
   VectorXd Uex;
-  std::cerr << "current_velocity: " << current_velocity << std::endl;
 
-  const int N = m_param.prediction_horizon;
-  RCLCPP_DEBUG(m_logger, "N = %d", N);
+  // const int N = m_param.prediction_horizon;
   const double DT = prediction_dt;
 
   // const int DIM_X = m_vehicle_model_ptr->getDimX();
