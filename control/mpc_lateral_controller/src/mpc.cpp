@@ -107,12 +107,6 @@ bool MPC::calculateMPC(
         current_kinematics.twist.twist.linear.x);
     }
 
-    // const auto & u = mpc.uopt()[0];  // const reference to the initial optimal control input
-    // mpc.update(t, x);                // update the MPC solution
-
-    // mpc.optError(t, x, settings.verbose_level);  // compute the optimal error
-    // logger.save(t, x, u, mpc.uopt(), mpc.optError(), mpc.normDiff(), mpc.StandardDeviation());
-
     success_opt = false;
     Uex = VectorXd::Zero(1);
 
@@ -657,26 +651,13 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
 }
 
 /*
- * solve quadratic optimization.
- * cost function: J = Xex' * Qex * Xex + (Uex - Uref)' * R1ex * (Uex - Uref_ex) + Uex' * R2ex * Uex
- *                , Qex = diag([Q,Q,...]), R1ex = diag([R,R,...])
- * constraint matrix : lb < U < ub, lbA < A*U < ubA
+ * solve optimization.
+ * cost function: TBD
+ * constraint matrix : TBD
  * current considered constraint
  *  - steering limit
  *  - steering rate limit
  *
- * (1)lb < u < ub && (2)lbA < Au < ubA --> (3)[lb, lbA] < [I, A]u < [ub, ubA]
- * (1)lb < u < ub ...
- * [-u_lim] < [ u0 ] < [u_lim]
- * [-u_lim] < [ u1 ] < [u_lim]
- *              ~~~
- * [-u_lim] < [ uN ] < [u_lim] (*N... DIM_U)
- * (2)lbA < Au < ubA ...
- * [prev_u0 - au_lim*ctp] < [   u0  ] < [prev_u0 + au_lim*ctp] (*ctp ... ctrl_period)
- * [    -au_lim * dt    ] < [u1 - u0] < [     au_lim * dt    ]
- * [    -au_lim * dt    ] < [u2 - u1] < [     au_lim * dt    ]
- *                            ~~~
- * [    -au_lim * dt    ] < [uN-uN-1] < [     au_lim * dt    ] (*N... DIM_U)
  */
 std::pair<bool, VectorXd> MPC::executeOptimization(
   const VectorXd & x0, const double prediction_dt, const MPCTrajectory & traj,
@@ -691,15 +672,6 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   // const int DIM_U = m_vehicle_model_ptr->getDimU();
   // const int DIM_Y = m_vehicle_model_ptr->getDimY();
   // const int DIM_U_N = m_param.prediction_horizon * m_vehicle_model_ptr->getDimU();
-
-  // Define the solver settings.
-  // cgmres::SolverSettings settings;
-  // settings.sampling_time = 0.001;  // sampling period
-  // settings.zeta = 1000;
-  // settings.finite_difference_epsilon = 1e-08;
-  // // For initialization.
-  // settings.max_iter = 50;
-  // settings.opterr_tol = 1e-06;
 
   auto t_start = std::chrono::system_clock::now();
   bool solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex);
