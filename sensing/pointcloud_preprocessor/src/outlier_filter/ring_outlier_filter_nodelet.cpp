@@ -71,7 +71,7 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     max_azimuth_diff_ = static_cast<float>(declare_parameter("max_azimuth_diff", 50.0));
     noise_threshold_ = static_cast<int>(declare_parameter("noise_threshold", 2));
 
-    roi_mode_ = static_cast<std::string>(declare_parameter("roi_mode", "Fixed_xyz_ROI"));
+    roi_mode_ = static_cast<std::string>(declare_parameter("roi_mode", "Fixed_azimuth_ROI"));
   }
 
   using std::placeholders::_1;
