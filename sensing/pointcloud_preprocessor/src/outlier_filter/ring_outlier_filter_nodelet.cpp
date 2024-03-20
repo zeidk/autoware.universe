@@ -386,8 +386,8 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
     }
   }
 
-  // uint32_t horizontal_resolution =
-  //   static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
+  uint32_t horizontal_resolution =
+    static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
 
   std::vector<pcl::PointCloud<PointXYZIRADRT>> pcl_noise_ring_array;
   pcl_noise_ring_array.resize(vertical_bins);
@@ -401,84 +401,86 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
   }
 
   for (const auto & single_ring : pcl_noise_ring_array) {
+    uint ring_id = single_ring.points.front().ring;
     if (single_ring.points.empty()) {
-      std::cerr << "Skipping empty ring" << std::endl;
+      std::cerr << "Skipping empty ring at: " << ring_id << std::endl;
       continue;
     }
 
-    uint ring_id = single_ring.points.front().ring;
-    std::vector<int> noise_frequency(horizontal_bins, 0);
-    // uint current_temp_segment_index = 0;
+    std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
+    uint horizontal_index_in_image = 0;
+    uint noise_point_idx = 0;
 
     std::cerr << "Analyzing ring: " << ring_id << " with points size " << single_ring.points.size()
               << " points." << std::endl;
+    // std::cerr << "Segment " << i << ": starting temp segment index " <<
+    // current_temp_segment_index
+    //           << std::endl;
 
-    for (uint i = 0; i < noise_frequency.size() - 1; i++) {
-      uint noise_point_idx = 0;
-      // std::cerr << "Segment " << i << ": starting temp segment index " <<
-      // current_temp_segment_index
-      //           << std::endl;
+    // float current_azimuth =
+    //   std::max(single_ring.points[current_temp_segment_index].azimuth, 0.0f);
+    // uint segment_upper_limit_index =
+    //   i + 1 + static_cast<uint>(min_azimuth / horizontal_resolution);
+    // float segment_upper_limit_azimuth = segment_upper_limit_index * horizontal_resolution;
 
-      // float current_azimuth =
-      //   std::max(single_ring.points[current_temp_segment_index].azimuth, 0.0f);
-      // uint segment_upper_limit_index =
-      //   i + 1 + static_cast<uint>(min_azimuth / horizontal_resolution);
-      // float segment_upper_limit_azimuth = segment_upper_limit_index * horizontal_resolution;
+    // std::cerr << "current_temp_segment_index: " << current_temp_segment_index
+    //           << ", current_azimuth: " << current_azimuth
+    //           << ", segment_upper_limit_index: " << segment_upper_limit_index
+    //           << ", segment_upper_limit_azimuth: " << segment_upper_limit_azimuth << std::endl;
 
-      // std::cerr << "current_temp_segment_index: " << current_temp_segment_index
-      //           << ", current_azimuth: " << current_azimuth
-      //           << ", segment_upper_limit_index: " << segment_upper_limit_index
-      //           << ", segment_upper_limit_azimuth: " << segment_upper_limit_azimuth << std::endl;
-      while ((uint)single_ring.points[noise_point_idx] <
-               ((i + static_cast<uint>(min_azimuth / horizontal_resolution) + 1) *
-                horizontal_resolution) &&
-             current_deleted_index < (deleted_azimuths.size() - 1)) {
-        noise_frequency[i] = noise_frequency[i] + 1;
-        current_deleted_index++;
-      }
+    uint next_horizontal_index_azimuth =
+      (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
+    while ((uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth &&
+           noise_point_idx < single_ring.size()) {
       switch (roi_mode_map_[roi_mode_]) {
         case 1: {
           if (
-            single_ring.points[current_temp_segment_index].x < x_max_ &&
-            single_ring.points[current_temp_segment_index].x > x_min_ &&
-            single_ring.points[current_temp_segment_index].y > y_max_ &&
-            single_ring.points[current_temp_segment_index].y < y_min_ &&
-            single_ring.points[current_temp_segment_index].z < z_max_ &&
-            single_ring.points[current_temp_segment_index].z > z_min_) {
-            noise_frequency[i] = noise_frequency[i] + 1;
+            single_ring.points[noise_point_idx].x < x_max_ &&
+            single_ring.points[noise_point_idx].x > x_min_ &&
+            single_ring.points[noise_point_idx].y > y_max_ &&
+            single_ring.points[noise_point_idx].y < y_min_ &&
+            single_ring.points[noise_point_idx].z < z_max_ &&
+            single_ring.points[noise_point_idx].z > z_min_) {
+            noise_frequency_in_single_ring[horizontal_index_in_image] =
+              noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
           }
           break;
         }
         case 2: {
           if (
-            single_ring.points[current_temp_segment_index].azimuth < max_azimuth &&
-            single_ring.points[current_temp_segment_index].azimuth > min_azimuth &&
-            single_ring.points[current_temp_segment_index].distance < max_distance_) {
-            noise_frequency[i] = noise_frequency[i] + 1;
+            single_ring.points[noise_point_idx].azimuth < max_azimuth &&
+            single_ring.points[noise_point_idx].azimuth > min_azimuth &&
+            single_ring.points[noise_point_idx].distance < max_distance_) {
+            noise_frequency_in_single_ring[horizontal_index_in_image] =
+              noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
           }
           break;
         }
         default: {
-          noise_frequency[i] = noise_frequency[i] + 1;
+          noise_frequency_in_single_ring[horizontal_index_in_image] =
+            noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
           break;
         }
-
-          // std::cerr << "current_temp_segment_index: " << current_temp_segment_index
-          //           << ", azimuth: " << single_ring.points[current_temp_segment_index].azimuth
-          //           << ", distance: " <<
-          //           single_ring.points[current_temp_segment_index].distance
-          //           << ", condition: " << condition << std::endl;
-
-          current_temp_segment_index++;
-          noise_frequency[i] =
-            std::min(noise_frequency[i], 255);  // Ensure the value is within uchar range.
-          frequency_image.at<uchar>(ring_id, i) = static_cast<uchar>(noise_frequency[i]);
       }
 
-      // std::cerr << "Segment " << i << ": completed with noise frequency " << noise_frequency[i]
+      // std::cerr << "current_temp_segment_index: " << current_temp_segment_index
+      //           << ", azimuth: " << single_ring.points[current_temp_segment_index].azimuth
+      //           << ", distance: " <<
+      //           single_ring.points[current_temp_segment_index].distance
+      //           << ", condition: " << condition << std::endl;
+
+      noise_point_idx++;
+      noise_frequency_in_single_ring[horizontal_index_in_image] = std::min(
+        noise_frequency_in_single_ring[horizontal_index_in_image],
+        255);  // Ensure the value is within uchar range.
+      frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
+        static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
+
+      // std::cerr << "Segment " << i << ": completed with noise frequency " <<
+      // noise_frequency_in_single_ring[i]
       //           << std::endl;
-      std::cerr << "noise_frequency ring_id: " << ring_id << " at i: " << i << " is "
-                << noise_frequency[i] << std::endl;
+      // std::cerr << "noise_frequency ring_id: " << ring_id << " at i: " << i << " is "
+      //           << noise_frequency[i] << std::endl;
     }
   }
 
