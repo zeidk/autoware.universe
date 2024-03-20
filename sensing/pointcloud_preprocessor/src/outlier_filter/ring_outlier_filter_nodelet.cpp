@@ -403,30 +403,12 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
   for (const auto & single_ring : pcl_noise_ring_array) {
     uint ring_id = single_ring.points.front().ring;
     if (single_ring.points.empty()) {
-      std::cerr << "Skipping empty ring at: " << ring_id << std::endl;
       continue;
     }
 
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
     uint horizontal_index_in_image = 0;
     uint noise_point_idx = 0;
-
-    std::cerr << "Analyzing ring: " << ring_id << " with points size " << single_ring.points.size()
-              << " points." << std::endl;
-    // std::cerr << "Segment " << i << ": starting temp segment index " <<
-    // current_temp_segment_index
-    //           << std::endl;
-
-    // float current_azimuth =
-    //   std::max(single_ring.points[current_temp_segment_index].azimuth, 0.0f);
-    // uint segment_upper_limit_index =
-    //   i + 1 + static_cast<uint>(min_azimuth / horizontal_resolution);
-    // float segment_upper_limit_azimuth = segment_upper_limit_index * horizontal_resolution;
-
-    // std::cerr << "current_temp_segment_index: " << current_temp_segment_index
-    //           << ", current_azimuth: " << current_azimuth
-    //           << ", segment_upper_limit_index: " << segment_upper_limit_index
-    //           << ", segment_upper_limit_azimuth: " << segment_upper_limit_azimuth << std::endl;
 
     uint next_horizontal_index_azimuth =
       (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
@@ -463,28 +445,15 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
         }
       }
 
-      // std::cerr << "current_temp_segment_index: " << current_temp_segment_index
-      //           << ", azimuth: " << single_ring.points[current_temp_segment_index].azimuth
-      //           << ", distance: " <<
-      //           single_ring.points[current_temp_segment_index].distance
-      //           << ", condition: " << condition << std::endl;
-
       noise_point_idx++;
       noise_frequency_in_single_ring[horizontal_index_in_image] = std::min(
         noise_frequency_in_single_ring[horizontal_index_in_image],
         255);  // Ensure the value is within uchar range.
       frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
         static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
-
-      // std::cerr << "Segment " << i << ": completed with noise frequency " <<
-      // noise_frequency_in_single_ring[i]
-      //           << std::endl;
-      // std::cerr << "noise_frequency ring_id: " << ring_id << " at i: " << i << " is "
-      //           << noise_frequency[i] << std::endl;
     }
   }
 
-  std::cerr << "finished crete binary image \n\n\n\n " << std::endl;
   // Threshold for diagnostics (tunable)
   cv::Mat binary_image;
   cv::inRange(frequency_image, noise_threshold_, 255, binary_image);
