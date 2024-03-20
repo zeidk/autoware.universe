@@ -386,6 +386,7 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
     }
   }
 
+  // Calculate the resolution of the azimuth
   uint32_t horizontal_resolution =
     static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
 
@@ -394,9 +395,8 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
 
   cv::Mat frequency_image(cv::Size(horizontal_bins, vertical_bins), CV_8UC1, cv::Scalar(0));
 
-  // Split into 36 x 10 degree bins x 40 lines (TODO: change to dynamic)
+  // Split into vertical_bins x horizontal_bins degree bins x 40 lines (TODO: change to dynamic)
   for (const auto & p : input_cloud->points) {
-    // std::cerr << "ring id: " << p.ring << std::endl;
     pcl_noise_ring_array.at(p.ring).push_back(p);
   }
 
@@ -415,19 +415,6 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
     while ((uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth &&
            noise_point_idx < single_ring.size()) {
       switch (roi_mode_map_[roi_mode_]) {
-        case 1: {
-          if (
-            single_ring.points[noise_point_idx].x < x_max_ &&
-            single_ring.points[noise_point_idx].x > x_min_ &&
-            single_ring.points[noise_point_idx].y > y_max_ &&
-            single_ring.points[noise_point_idx].y < y_min_ &&
-            single_ring.points[noise_point_idx].z < z_max_ &&
-            single_ring.points[noise_point_idx].z > z_min_) {
-            noise_frequency_in_single_ring[horizontal_index_in_image] =
-              noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
-          }
-          break;
-        }
         case 2: {
           if (
             single_ring.points[noise_point_idx].azimuth < max_azimuth &&
@@ -439,6 +426,7 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
           break;
         }
         default: {
+          RCLCPP_WARN_THROTTLE(get_logger(), "Invalid ROI mode", 1000);
           noise_frequency_in_single_ring[horizontal_index_in_image] =
             noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
           break;
