@@ -14,12 +14,9 @@
 
 #include "pointcloud_preprocessor/outlier_filter/ring_outlier_filter_nodelet.hpp"
 
-#include "autoware_auto_geometry/common_3d.hpp"
 #include "autoware_point_types/types.hpp"
 
 #include <sensor_msgs/point_cloud2_iterator.hpp>
-
-#include <pcl/search/pcl_search.h>
 
 #include <algorithm>
 #include <vector>
@@ -407,12 +404,18 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
     }
     uint ring_id = single_ring.points.front().ring;
 
+    std::cerr << "Analyzing ring: " << ring_id << " with points size " << single_ring.points.size()
+              << " points." << std::endl;
+
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
     uint horizontal_index_in_image = 0;
     uint noise_point_idx = 0;
 
     uint next_horizontal_index_azimuth =
       (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
+
+    std::cerr << "horizontal_index_in_image: " << horizontal_index_in_image
+              << ", next_horizontal_index_azimuth: " << next_horizontal_index_azimuth << std::endl;
     while (noise_point_idx < single_ring.size() &&
            (uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth) {
       switch (roi_mode_map_[roi_mode_]) {
@@ -434,12 +437,15 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
         }
       }
       noise_point_idx++;
-      noise_frequency_in_single_ring[horizontal_index_in_image] = std::min(
-        noise_frequency_in_single_ring[horizontal_index_in_image],
-        255);  // Ensure the value is within uchar range.
-      frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
-        static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
     }
+    noise_frequency_in_single_ring[horizontal_index_in_image] = std::min(
+      noise_frequency_in_single_ring[horizontal_index_in_image],
+      255);  // Ensure the value is within uchar range.
+    frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
+      static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
+    std::cerr << "ring id: " << ring_id << "horizontal_index_in_image " << horizontal_index_in_image
+              << ": completed with noise frequency "
+              << noise_frequency_in_single_ring[horizontal_index_in_image] << std::endl;
     horizontal_index_in_image++;
   }
 
