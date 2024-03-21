@@ -387,6 +387,7 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
   }
 
   // Calculate the resolution of the azimuth
+  // TODO(Sugahara): zero divide check
   uint32_t horizontal_resolution =
     static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
 
@@ -401,10 +402,10 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
   }
 
   for (const auto & single_ring : pcl_noise_ring_array) {
-    uint ring_id = single_ring.points.front().ring;
     if (single_ring.points.empty()) {
       continue;
     }
+    uint ring_id = single_ring.points.front().ring;
 
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
     uint horizontal_index_in_image = 0;
@@ -412,8 +413,8 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
 
     uint next_horizontal_index_azimuth =
       (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
-    while ((uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth &&
-           noise_point_idx < single_ring.size()) {
+    while (noise_point_idx < single_ring.size() &&
+           (uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth) {
       switch (roi_mode_map_[roi_mode_]) {
         case 2: {
           if (
@@ -426,13 +427,12 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
           break;
         }
         default: {
-          RCLCPP_WARN_THROTTLE(get_logger(), "Invalid ROI mode", 1000);
+          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Invalid ROI mode");
           noise_frequency_in_single_ring[horizontal_index_in_image] =
             noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
           break;
         }
       }
-
       noise_point_idx++;
       noise_frequency_in_single_ring[horizontal_index_in_image] = std::min(
         noise_frequency_in_single_ring[horizontal_index_in_image],
@@ -440,6 +440,7 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
       frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
         static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
     }
+    horizontal_index_in_image++;
   }
 
   // Threshold for diagnostics (tunable)
