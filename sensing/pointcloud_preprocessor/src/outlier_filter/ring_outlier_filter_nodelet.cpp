@@ -408,51 +408,49 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
 
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
 
-    for (uint horizontal_index_in_image = 0; horizontal_index_in_image < horizontal_bins;
-         ++horizontal_index_in_image) {
-      uint noise_point_idx = 0;
-      uint next_horizontal_index_azimuth =
-        (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
-      std::cerr << "horizontal_index_in_image: " << horizontal_index_in_image
-                << ", next_horizontal_index_azimuth: " << next_horizontal_index_azimuth
-                << std::endl;
-      std::cerr << "max_azimuth: " << max_azimuth << ", min_azimuth: " << min_azimuth << std::endl;
-      std::cerr << "noise_point_idx: " << noise_point_idx
-                << " single_ring.size(): " << single_ring.size()
-                << " single_ring.points[noise_point_idx].azimuth: "
-                << static_cast<float>(single_ring.points[noise_point_idx].azimuth)
-                << " single_ring.points[noise_point_idx].distance: "
-                << single_ring.points[noise_point_idx].distance
-                << " max_distance_: " << max_distance_ << std::endl;
-      while (noise_point_idx < single_ring.size() &&
-             (uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth) {
-        if (
-          (single_ring.points[noise_point_idx].azimuth < max_azimuth &&
-           single_ring.points[noise_point_idx].azimuth > min_azimuth) &&
-          single_ring.points[noise_point_idx].distance < max_distance_) {
-          noise_frequency_in_single_ring[horizontal_index_in_image]++;
-          std::cerr << " noise_point_idx: " << noise_point_idx
-                    << " azimuth: " << single_ring.points[noise_point_idx].azimuth
-                    << " distance: " << single_ring.points[noise_point_idx].distance
-                    << "noise point found" << std::endl;
-        } else {
-          std::cerr << " noise_point_idx: " << noise_point_idx
-                    << " azimuth: " << single_ring.points[noise_point_idx].azimuth
-                    << " distance: " << single_ring.points[noise_point_idx].distance
-                    << "noise point not found" << std::endl;
+    for (uint noise_point_idx = 0; noise_point_idx < single_ring.points.size(); noise_point_idx++) {
+      if (
+        min_azimuth >= single_ring.points[noise_point_idx].azimuth ||
+        single_ring.points[noise_point_idx].azimuth >= max_azimuth) {
+        continue;
+      } else {
+        for (uint horizontal_index_in_image = 0; horizontal_index_in_image < horizontal_bins;
+             ++horizontal_index_in_image) {
+          uint lower_azimuth = horizontal_index_in_image * horizontal_resolution + min_azimuth;
+          uint upper_azimuth =
+            (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
+          if (
+            single_ring.points[noise_point_idx].azimuth >= lower_azimuth &&
+            single_ring.points[noise_point_idx].azimuth < upper_azimuth &&
+            single_ring.points[noise_point_idx].distance < max_distance_) {
+            noise_frequency_in_single_ring[horizontal_index_in_image]++;
+            // Ensure the value is within uchar range
+            noise_frequency_in_single_ring[horizontal_index_in_image] =
+              std::min(noise_frequency_in_single_ring[horizontal_index_in_image], 255);
+            frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
+              static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
+            // std::cerr << " noise_point_idx: " << noise_point_idx
+            //           << "noise point found in ring: " << ring_id << " noise_frequency: "
+            //           << noise_frequency_in_single_ring[horizontal_index_in_image] << std::endl;
+          } else {
+            // std::cerr << " noise_point_idx: " << noise_point_idx << "noise point not found"
+            //           << std::endl;
+          }
+
+          // std::cerr << "\n[INFO] Noise Point Index: " << noise_point_idx
+          //           << "\n[INFO] Single Ring Size: " << single_ring.size()
+          //           << "\n[INFO] Horizontal Index: " << horizontal_index_in_image
+          //           << "\n[INFO] Next Horizontal Index Azimuth: " <<
+          //           next_horizontal_index_azimuth
+          //           << "\n[INFO] Single Ring Point Azimuth: "
+          //           << static_cast<float>(single_ring.points[noise_point_idx].azimuth)
+          //           << "\n[INFO] Max Azimuth: " << max_azimuth
+          //           << "\n[INFO] Min Azimuth: " << min_azimuth
+          //           << "\n[INFO] Single Ring Point Distance: "
+          //           << single_ring.points[noise_point_idx].distance
+          //           << "\n[INFO] Max Distance: " << max_distance_ << std::endl;
         }
-
-        noise_point_idx++;
       }
-
-      // Ensure the value is within uchar range
-      noise_frequency_in_single_ring[horizontal_index_in_image] =
-        std::min(noise_frequency_in_single_ring[horizontal_index_in_image], 255);
-      frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
-        static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
-      std::cerr << "ring id: " << ring_id << " horizontal_index_in_image "
-                << horizontal_index_in_image << ": completed with noise frequency "
-                << noise_frequency_in_single_ring[horizontal_index_in_image] << std::endl;
     }
   }
 
@@ -468,6 +466,17 @@ float RingOutlierFilterComponent::calculateFilledPixels(
   float num_filled_pixels =
     static_cast<float>(num_pixels) / static_cast<float>(vertical_bins * horizontal_bins);
   return num_filled_pixels;
+}
+
+void printRingInfo(const pcl::PointCloud<PointXYZIRADRT> & single_ring, int noise_point_idx)
+{
+  std::cerr << "\n[INFO] Noise Point Index: " << noise_point_idx
+            << "\n[INFO] Single Ring Size: " << single_ring.size()
+            << "\n[INFO] Single Ring Point Azimuth: "
+            << static_cast<float>(single_ring.points[noise_point_idx].azimuth)
+            << "\n[INFO] Single Ring Point Distance: "
+            << single_ring.points[noise_point_idx].distance << std::endl;
+  return;
 }
 
 sensor_msgs::msg::Image RingOutlierFilterComponent::toFrequencyImageMsg(
