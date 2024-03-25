@@ -79,12 +79,13 @@ bool MPC::calculateMPC(
     return fail_warn_throttle("trajectory resampling failed. Stop MPC.");
   }
 
-  bool success_opt;
+  bool success_opt = false;
   VectorXd Uex;
-  MPCMatrix mpc_matrix;
+  // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
+  const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
 
   for (Eigen::Index i = 0; i < x0_delayed.size(); ++i) {
-    std::cerr << "x0_delayed: " << x0_delayed(i) << std::endl;
+    std::cerr << "x0_delayed [" << i << "]: " << x0_delayed(i) << std::endl;
   }
 
   if (qp_solver_type == "cgmres") {
@@ -107,13 +108,7 @@ bool MPC::calculateMPC(
         current_kinematics.twist.twist.linear.x);
     }
 
-    success_opt = false;
-    Uex = VectorXd::Zero(1);
-
   } else {
-    // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
-    mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
-
     // solve Optimization problem
     std::tie(success_opt, Uex) = executeOptimization(
       mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
@@ -356,6 +351,7 @@ std::pair<bool, MPCTrajectory> MPC::resampleMPCTrajectoryByTime(
   }
   // Publish resampled reference trajectory for debug purpose.
   if (m_debug_publish_resampled_reference_trajectory) {
+    RCLCPP_DEBUG(m_logger, "publish resampled reference trajectory");
     const auto converted_output = MPCUtils::convertToAutowareTrajectory(output);
     m_debug_resampled_reference_trajectory_pub->publish(converted_output);
   }

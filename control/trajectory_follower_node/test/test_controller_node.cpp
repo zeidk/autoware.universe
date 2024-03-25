@@ -16,7 +16,13 @@
 #include "fake_test_node/fake_test_node.hpp"
 #include "gtest/gtest.h"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp/serialization.hpp"
+#include "rclcpp/serialized_message.hpp"
 #include "rclcpp/time.hpp"
+#include "rcutils/time.h"
+#include "rosbag2_cpp/writers/sequential_writer.hpp"
+#include "rosbag2_storage/serialized_bag_message.hpp"
+#include "rosbag2_storage/topic_metadata.hpp"
 #include "trajectory_follower_node/controller_node.hpp"
 #include "trajectory_follower_test_utils.hpp"
 
@@ -63,7 +69,7 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
     enable_keep_stopped_until_steer_convergence);  // longitudinal
   node_options.arguments(
     {"--ros-args", "--params-file",
-     lateral_share_dir + "/param/lateral_controller_defaults.param.yaml", "--params-file",
+     lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
      longitudinal_share_dir + "/param/longitudinal_controller_defaults.param.yaml", "--params-file",
      share_dir + "/test/test_vehicle_info.param.yaml", "--params-file",
      share_dir + "/test/test_nearest_search.param.yaml", "--params-file",
@@ -85,6 +91,50 @@ std::shared_ptr<Controller> makeNode(const rclcpp::NodeOptions & node_options)
   return node;
 }
 
+template <typename MessageType>
+void save_message_to_rosbag(
+  const std::string & bag_directory, const std::shared_ptr<MessageType> & message,
+  const std::string & topic_name)
+{
+  auto writer = std::make_shared<rosbag2_cpp::writers::SequentialWriter>();
+  rosbag2_storage::StorageOptions storage_options{bag_directory, "sqlite3"};
+  rosbag2_cpp::ConverterOptions converter_options{"cdr", "cdr"};
+  writer->open(storage_options, converter_options);
+
+  rosbag2_storage::TopicMetadata topic_metadata;
+  topic_metadata.name = topic_name;
+  topic_metadata.type = rosidl_generator_traits::data_type<MessageType>();
+  topic_metadata.serialization_format = "cdr";
+  writer->create_topic(topic_metadata);
+
+  rclcpp::SerializedMessage serialized_message;
+  rclcpp::Serialization<MessageType> serializer;
+  serializer.serialize_message(message.get(), &serialized_message);
+
+  auto bag_message = std::make_shared<rosbag2_storage::SerializedBagMessage>();
+  bag_message->serialized_data = std::shared_ptr<rcutils_uint8_array_t>(
+    &serialized_message.get_rcl_serialized_message(), [](rcutils_uint8_array_t * /* unused */) {});
+  bag_message->topic_name = topic_name;
+
+  rcutils_time_point_value_t now;
+  auto ret = rcutils_system_time_now(&now);
+  if (ret != RCUTILS_RET_OK) {
+    std::cerr << "Failed to get current system time: " << rcutils_get_error_string().str
+              << std::endl;
+    return;  // Early return on error
+  }
+  bag_message->time_stamp = now;
+
+  writer->write(bag_message);
+
+  // Function continues after this point if needed.
+  // For instance, you might want to log success, perform cleanup, or other actions.
+  std::cout << "Successfully wrote message to rosbag: " << bag_directory << std::endl;
+
+  // Note: Cleanup and resource deallocation (if necessary) happens automatically
+  // as we are using smart pointers and RAII patterns.
+}
+
 class ControllerTester
 {
 public:
@@ -98,6 +148,9 @@ public:
 
   AckermannControlCommand::SharedPtr cmd_msg;
   bool received_control_command = false;
+
+  Trajectory::SharedPtr resampled_reference_trajectory;
+  bool received_resampled_reference_trajectory = false;
 
   void publish_default_odom()
   {
@@ -185,6 +238,13 @@ public:
         cmd_msg = msg;
         received_control_command = true;
       });
+
+  rclcpp::Subscription<Trajectory>::SharedPtr traj_sub = fnf->create_subscription<Trajectory>(
+    "controller/debug/resampled_reference_trajectory", *fnf->get_fake_node(),
+    [this](const Trajectory::SharedPtr msg) {
+      resampled_reference_trajectory = msg;
+      received_resampled_reference_trajectory = true;
+    });
 
   std::shared_ptr<tf2_ros::StaticTransformBroadcaster> br =
     std::make_shared<tf2_ros::StaticTransformBroadcaster>(fnf->get_fake_node());
@@ -287,6 +347,13 @@ TEST_F(FakeNodeFixture, right_turn)
 
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
   ASSERT_TRUE(tester.received_control_command);
+  ASSERT_TRUE(tester.received_resampled_reference_trajectory);
+
+  // const auto save_directory = "/home/kyoichi-sugahara/workspace/log/reference_trajectory";
+  // save_message_to_rosbag(
+  //   save_directory, tester.resampled_reference_trajectory,
+  //   "controller/debug/resampled_reference_trajectory");
+
   std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
   std::cerr << "lat steer tire rotation rate: "
             << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;

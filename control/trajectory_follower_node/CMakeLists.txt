@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.14)
 project(trajectory_follower_node)
 
 find_package(autoware_cmake REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rosbag2_storage REQUIRED)
 autoware_package()
 
 set(CONTROLLER_NODE controller_node)
@@ -38,8 +40,8 @@ if(BUILD_TESTING)
     ${TRAJECTORY_FOLLOWER_NODES_TEST} ${CONTROLLER_NODE})
 
   find_package(autoware_testing REQUIRED)
-  # smoke test for MPC controller
 
+  # smoke test for MPC controller
 endif()
 
 ament_auto_package(
