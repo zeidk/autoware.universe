@@ -382,9 +382,8 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
       break;
     }
   }
-
   // Calculate the resolution of the azimuth
-  // TODO(Sugahara): zero divide check
+
   uint32_t horizontal_resolution =
     static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
 
@@ -408,48 +407,55 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
               << " points." << std::endl;
 
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
-    uint horizontal_index_in_image = 0;
-    uint noise_point_idx = 0;
 
-    uint next_horizontal_index_azimuth =
-      (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
+    for (uint horizontal_index_in_image = 0; horizontal_index_in_image < horizontal_bins;
+         ++horizontal_index_in_image) {
+      uint noise_point_idx = 0;
+      uint next_horizontal_index_azimuth =
+        (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
+      std::cerr << "horizontal_index_in_image: " << horizontal_index_in_image
+                << ", next_horizontal_index_azimuth: " << next_horizontal_index_azimuth
+                << std::endl;
+      std::cerr << "max_azimuth: " << max_azimuth << ", min_azimuth: " << min_azimuth << std::endl;
+      std::cerr << "noise_point_idx: " << noise_point_idx
+                << " single_ring.size(): " << single_ring.size()
+                << " single_ring.points[noise_point_idx].azimuth: "
+                << static_cast<float>(single_ring.points[noise_point_idx].azimuth)
+                << " single_ring.points[noise_point_idx].distance: "
+                << single_ring.points[noise_point_idx].distance
+                << " max_distance_: " << max_distance_ << std::endl;
+      while (noise_point_idx < single_ring.size() &&
+             (uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth) {
+        if (
+          (single_ring.points[noise_point_idx].azimuth < max_azimuth &&
+           single_ring.points[noise_point_idx].azimuth > min_azimuth) &&
+          single_ring.points[noise_point_idx].distance < max_distance_) {
+          noise_frequency_in_single_ring[horizontal_index_in_image]++;
+          std::cerr << " noise_point_idx: " << noise_point_idx
+                    << " azimuth: " << single_ring.points[noise_point_idx].azimuth
+                    << " distance: " << single_ring.points[noise_point_idx].distance
+                    << "noise point found" << std::endl;
+        } else {
+          std::cerr << " noise_point_idx: " << noise_point_idx
+                    << " azimuth: " << single_ring.points[noise_point_idx].azimuth
+                    << " distance: " << single_ring.points[noise_point_idx].distance
+                    << "noise point not found" << std::endl;
+        }
 
-    std::cerr << "horizontal_index_in_image: " << horizontal_index_in_image
-              << ", next_horizontal_index_azimuth: " << next_horizontal_index_azimuth << std::endl;
-    while (noise_point_idx < single_ring.size() &&
-           (uint)single_ring.points[noise_point_idx].azimuth < next_horizontal_index_azimuth) {
-      switch (roi_mode_map_[roi_mode_]) {
-        case 2: {
-          if (
-            single_ring.points[noise_point_idx].azimuth < max_azimuth &&
-            single_ring.points[noise_point_idx].azimuth > min_azimuth &&
-            single_ring.points[noise_point_idx].distance < max_distance_) {
-            noise_frequency_in_single_ring[horizontal_index_in_image] =
-              noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
-          }
-          break;
-        }
-        default: {
-          RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, "Invalid ROI mode");
-          noise_frequency_in_single_ring[horizontal_index_in_image] =
-            noise_frequency_in_single_ring[horizontal_index_in_image] + 1;
-          break;
-        }
+        noise_point_idx++;
       }
-      noise_point_idx++;
+
+      // Ensure the value is within uchar range
+      noise_frequency_in_single_ring[horizontal_index_in_image] =
+        std::min(noise_frequency_in_single_ring[horizontal_index_in_image], 255);
+      frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
+        static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
+      std::cerr << "ring id: " << ring_id << " horizontal_index_in_image "
+                << horizontal_index_in_image << ": completed with noise frequency "
+                << noise_frequency_in_single_ring[horizontal_index_in_image] << std::endl;
     }
-    noise_frequency_in_single_ring[horizontal_index_in_image] = std::min(
-      noise_frequency_in_single_ring[horizontal_index_in_image],
-      255);  // Ensure the value is within uchar range.
-    frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
-      static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
-    std::cerr << "ring id: " << ring_id << "horizontal_index_in_image " << horizontal_index_in_image
-              << ": completed with noise frequency "
-              << noise_frequency_in_single_ring[horizontal_index_in_image] << std::endl;
-    horizontal_index_in_image++;
   }
 
-  // Threshold for diagnostics (tunable)
   cv::Mat binary_image;
   cv::inRange(frequency_image, noise_threshold_, 255, binary_image);
   return binary_image;
