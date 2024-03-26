@@ -85,7 +85,8 @@ bool MPC::calculateMPC(
   const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
 
   for (Eigen::Index i = 0; i < x0_delayed.size(); ++i) {
-    std::cerr << "x0_delayed [" << i << "]: " << x0_delayed(i) << std::endl;
+    RCLCPP_DEBUG(m_logger, "x0_delayed [%ld]: %f", i, x0_delayed(i));
+    // std::cerr << "x0_delayed [" << i << "]: " << x0_delayed(i) << std::endl;
   }
 
   if (qp_solver_type == "cgmres") {
