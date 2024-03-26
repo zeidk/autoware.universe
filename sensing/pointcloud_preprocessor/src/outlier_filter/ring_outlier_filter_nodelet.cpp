@@ -96,7 +96,7 @@ void RingOutlierFilterComponent::faster_filter(
   PointCloud2 outlier_points;
   size_t outlier_points_size = 0;
   if (publish_outlier_pointcloud_) {
-    outlier_points.point_step = sizeof(PointXYZI);
+    outlier_points.point_step = sizeof(PointXYZIRADRT);
     outlier_points.data.resize(outlier_points.point_step * input->width);
   }
 
@@ -183,9 +183,9 @@ void RingOutlierFilterComponent::faster_filter(
       } else if (publish_outlier_pointcloud_) {
         for (int i = walk_first_idx; i <= walk_last_idx; i++) {
           auto outlier_ptr =
-            reinterpret_cast<PointXYZI *>(&outlier_points.data[outlier_points_size]);
+            reinterpret_cast<PointXYZIRADRT *>(&outlier_points.data[outlier_points_size]);
           auto input_ptr =
-            reinterpret_cast<const PointXYZI *>(&input->data[indices[walk_first_idx]]);
+            reinterpret_cast<const PointXYZIRADRT *>(&input->data[indices[walk_first_idx]]);
           if (transform_info.need_transform) {
             Eigen::Vector4f p(input_ptr->x, input_ptr->y, input_ptr->z, 1);
             p = transform_info.eigen_transform * p;
@@ -198,6 +198,15 @@ void RingOutlierFilterComponent::faster_filter(
           const float & intensity = *reinterpret_cast<const float *>(
             &input->data[indices[walk_first_idx] + intensity_offset]);
           outlier_ptr->intensity = intensity;
+          const uint16_t & ring = *reinterpret_cast<const uint16_t *>(
+            &input->data[indices[walk_first_idx] + ring_offset]);
+          outlier_ptr->ring = ring;
+          const float & azimuth = *reinterpret_cast<const float *>(
+            &input->data[indices[walk_first_idx] + azimuth_offset]);
+          outlier_ptr->azimuth = azimuth;
+          const float & distance = *reinterpret_cast<const float *>(
+            &input->data[indices[walk_first_idx] + distance_offset]);
+          outlier_ptr->distance = distance;
 
           outlier_points_size += outlier_points.point_step;
         }
@@ -232,8 +241,9 @@ void RingOutlierFilterComponent::faster_filter(
       }
     } else if (publish_outlier_pointcloud_) {
       for (int i = walk_first_idx; i < walk_last_idx; i++) {
-        auto outlier_ptr = reinterpret_cast<PointXYZI *>(&outlier_points.data[outlier_points_size]);
-        auto input_ptr = reinterpret_cast<const PointXYZI *>(&input->data[indices[i]]);
+        auto outlier_ptr =
+          reinterpret_cast<PointXYZIRADRT *>(&outlier_points.data[outlier_points_size]);
+        auto input_ptr = reinterpret_cast<const PointXYZIRADRT *>(&input->data[indices[i]]);
         if (transform_info.need_transform) {
           Eigen::Vector4f p(input_ptr->x, input_ptr->y, input_ptr->z, 1);
           p = transform_info.eigen_transform * p;
@@ -246,7 +256,15 @@ void RingOutlierFilterComponent::faster_filter(
         const float & intensity =
           *reinterpret_cast<const float *>(&input->data[indices[i] + intensity_offset]);
         outlier_ptr->intensity = intensity;
-        outlier_points_size += outlier_points.point_step;
+        const uint16_t & ring =
+          *reinterpret_cast<const uint16_t *>(&input->data[indices[i] + ring_offset]);
+        outlier_ptr->ring = ring;
+        const float & azimuth =
+          *reinterpret_cast<const float *>(&input->data[indices[i] + azimuth_offset]);
+        outlier_ptr->azimuth = azimuth;
+        const float & distance =
+          *reinterpret_cast<const float *>(&input->data[indices[i] + distance_offset]);
+        outlier_ptr->distance = distance;
       }
     }
   }
@@ -254,7 +272,7 @@ void RingOutlierFilterComponent::faster_filter(
   setUpPointCloudFormat(input, output, output_size, /*num_fields=*/4);
 
   if (publish_outlier_pointcloud_) {
-    setUpPointCloudFormat(input, outlier_points, outlier_points_size, /*num_fields=*/4);
+    setUpPointCloudFormat(input, outlier_points, outlier_points_size, /*num_fields=*/8);
     outlier_pointcloud_publisher_->publish(outlier_points);
 
     const auto frequency_image = createBinaryImage(*input);
@@ -353,10 +371,20 @@ void RingOutlierFilterComponent::setUpPointCloudFormat(
   formatted_points.is_dense = input->is_dense;
 
   sensor_msgs::PointCloud2Modifier pcd_modifier(formatted_points);
-  pcd_modifier.setPointCloud2Fields(
-    num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
-    sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-    "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
+  if (num_fields == 4) {
+    pcd_modifier.setPointCloud2Fields(
+      num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
+      sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+      "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
+  } else {
+    pcd_modifier.setPointCloud2Fields(
+      num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
+      sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+      "intensity", 1, sensor_msgs::msg::PointField::FLOAT32, "ring", 1,
+      sensor_msgs::msg::PointField::UINT16, "azimuth", 1, sensor_msgs::msg::PointField::FLOAT32,
+      "distance", 1, sensor_msgs::msg::PointField::FLOAT32, "return_type", 1,
+      sensor_msgs::msg::PointField::UINT8, "time_stamp", 1, sensor_msgs::msg::PointField::FLOAT64);
+  }
 }
 
 cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::PointCloud2 & input)
@@ -366,30 +394,12 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
 
   uint32_t vertical_bins = vertical_bins_;
   uint32_t horizontal_bins = 10;
-  float max_azimuth;
-  float min_azimuth;
-
-  switch (roi_mode_map_[roi_mode_]) {
-    case 2: {
-      max_azimuth = max_azimuth_deg_ * 100.0;
-      min_azimuth = min_azimuth_deg_ * 100.0;
-      break;
-    }
-
-    default: {
-      max_azimuth = 36000.0f;
-      min_azimuth = 0.0f;
-      break;
-    }
-  }
+  float max_azimuth = (roi_mode_map_[roi_mode_] == 2) ? max_azimuth_deg_ * 100.0 : 36000.0f;
+  float min_azimuth = (roi_mode_map_[roi_mode_] == 2) ? min_azimuth_deg_ * 100.0 : 0.0f;
   // Calculate the resolution of the azimuth
-
   uint32_t horizontal_resolution =
     static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
-
-  std::vector<pcl::PointCloud<PointXYZIRADRT>> pcl_noise_ring_array;
-  pcl_noise_ring_array.resize(vertical_bins);
-
+  std::vector<pcl::PointCloud<PointXYZIRADRT>> pcl_noise_ring_array(vertical_bins);
   cv::Mat frequency_image(cv::Size(horizontal_bins, vertical_bins), CV_8UC1, cv::Scalar(0));
 
   // Split into vertical_bins x horizontal_bins degree bins x 40 lines (TODO: change to dynamic)
@@ -398,57 +408,29 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
   }
 
   for (const auto & single_ring : pcl_noise_ring_array) {
-    if (single_ring.points.empty()) {
-      continue;
-    }
-    uint ring_id = single_ring.points.front().ring;
+    if (single_ring.points.empty()) continue;
 
+    uint ring_id = single_ring.points.front().ring;
     std::cerr << "Analyzing ring: " << ring_id << " with points size " << single_ring.points.size()
               << " points." << std::endl;
-
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
 
-    for (uint noise_point_idx = 0; noise_point_idx < single_ring.points.size(); noise_point_idx++) {
-      if (
-        min_azimuth >= single_ring.points[noise_point_idx].azimuth ||
-        single_ring.points[noise_point_idx].azimuth >= max_azimuth) {
-        continue;
-      } else {
-        for (uint horizontal_index_in_image = 0; horizontal_index_in_image < horizontal_bins;
-             ++horizontal_index_in_image) {
-          uint lower_azimuth = horizontal_index_in_image * horizontal_resolution + min_azimuth;
-          uint upper_azimuth =
-            (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
-          if (
-            single_ring.points[noise_point_idx].azimuth >= lower_azimuth &&
-            single_ring.points[noise_point_idx].azimuth < upper_azimuth &&
-            single_ring.points[noise_point_idx].distance < max_distance_) {
-            noise_frequency_in_single_ring[horizontal_index_in_image]++;
-            // Ensure the value is within uchar range
-            noise_frequency_in_single_ring[horizontal_index_in_image] =
-              std::min(noise_frequency_in_single_ring[horizontal_index_in_image], 255);
-            frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
-              static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
-            // std::cerr << " noise_point_idx: " << noise_point_idx
-            //           << "noise point found in ring: " << ring_id << " noise_frequency: "
-            //           << noise_frequency_in_single_ring[horizontal_index_in_image] << std::endl;
-          } else {
-            // std::cerr << " noise_point_idx: " << noise_point_idx << "noise point not found"
-            //           << std::endl;
-          }
-
-          // std::cerr << "\n[INFO] Noise Point Index: " << noise_point_idx
-          //           << "\n[INFO] Single Ring Size: " << single_ring.size()
-          //           << "\n[INFO] Horizontal Index: " << horizontal_index_in_image
-          //           << "\n[INFO] Next Horizontal Index Azimuth: " <<
-          //           next_horizontal_index_azimuth
-          //           << "\n[INFO] Single Ring Point Azimuth: "
-          //           << static_cast<float>(single_ring.points[noise_point_idx].azimuth)
-          //           << "\n[INFO] Max Azimuth: " << max_azimuth
-          //           << "\n[INFO] Min Azimuth: " << min_azimuth
-          //           << "\n[INFO] Single Ring Point Distance: "
-          //           << single_ring.points[noise_point_idx].distance
-          //           << "\n[INFO] Max Distance: " << max_distance_ << std::endl;
+    for (const auto & point : single_ring.points) {
+      if (point.azimuth < min_azimuth || point.azimuth >= max_azimuth) continue;
+      for (uint horizontal_index_in_image = 0; horizontal_index_in_image < horizontal_bins;
+           ++horizontal_index_in_image) {
+        uint lower_azimuth = horizontal_index_in_image * horizontal_resolution + min_azimuth;
+        uint upper_azimuth = (horizontal_index_in_image + 1) * horizontal_resolution + min_azimuth;
+        if (
+          point.azimuth >= lower_azimuth && point.azimuth < upper_azimuth &&
+          point.distance < max_distance_) {
+          noise_frequency_in_single_ring[horizontal_index_in_image]++;
+          // Ensure the value is within uchar range
+          noise_frequency_in_single_ring[horizontal_index_in_image] =
+            std::min(noise_frequency_in_single_ring[horizontal_index_in_image], 255);
+          frequency_image.at<uchar>(ring_id, horizontal_index_in_image) =
+            static_cast<uchar>(noise_frequency_in_single_ring[horizontal_index_in_image]);
+          break;
         }
       }
     }
