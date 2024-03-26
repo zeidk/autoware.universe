@@ -198,15 +198,15 @@ void RingOutlierFilterComponent::faster_filter(
           const float & intensity = *reinterpret_cast<const float *>(
             &input->data[indices[walk_first_idx] + intensity_offset]);
           outlier_ptr->intensity = intensity;
-          const uint16_t & ring = *reinterpret_cast<const uint16_t *>(
-            &input->data[indices[walk_first_idx] + ring_offset]);
-          outlier_ptr->ring = ring;
-          const float & azimuth = *reinterpret_cast<const float *>(
-            &input->data[indices[walk_first_idx] + azimuth_offset]);
-          outlier_ptr->azimuth = azimuth;
-          const float & distance = *reinterpret_cast<const float *>(
-            &input->data[indices[walk_first_idx] + distance_offset]);
-          outlier_ptr->distance = distance;
+          // const uint16_t & ring = *reinterpret_cast<const uint16_t *>(
+          //   &input->data[indices[walk_first_idx] + ring_offset]);
+          // outlier_ptr->ring = ring;
+          // const float & azimuth = *reinterpret_cast<const float *>(
+          //   &input->data[indices[walk_first_idx] + azimuth_offset]);
+          // outlier_ptr->azimuth = azimuth;
+          // const float & distance = *reinterpret_cast<const float *>(
+          //   &input->data[indices[walk_first_idx] + distance_offset]);
+          // outlier_ptr->distance = distance;
 
           outlier_points_size += outlier_points.point_step;
         }
@@ -256,15 +256,15 @@ void RingOutlierFilterComponent::faster_filter(
         const float & intensity =
           *reinterpret_cast<const float *>(&input->data[indices[i] + intensity_offset]);
         outlier_ptr->intensity = intensity;
-        const uint16_t & ring =
-          *reinterpret_cast<const uint16_t *>(&input->data[indices[i] + ring_offset]);
-        outlier_ptr->ring = ring;
-        const float & azimuth =
-          *reinterpret_cast<const float *>(&input->data[indices[i] + azimuth_offset]);
-        outlier_ptr->azimuth = azimuth;
-        const float & distance =
-          *reinterpret_cast<const float *>(&input->data[indices[i] + distance_offset]);
-        outlier_ptr->distance = distance;
+        // const uint16_t & ring =
+        //   *reinterpret_cast<const uint16_t *>(&input->data[indices[i] + ring_offset]);
+        // outlier_ptr->ring = ring;
+        // const float & azimuth =
+        //   *reinterpret_cast<const float *>(&input->data[indices[i] + azimuth_offset]);
+        // outlier_ptr->azimuth = azimuth;
+        // const float & distance =
+        //   *reinterpret_cast<const float *>(&input->data[indices[i] + distance_offset]);
+        // outlier_ptr->distance = distance;
       }
     }
   }
@@ -272,7 +272,7 @@ void RingOutlierFilterComponent::faster_filter(
   setUpPointCloudFormat(input, output, output_size, /*num_fields=*/4);
 
   if (publish_outlier_pointcloud_) {
-    setUpPointCloudFormat(input, outlier_points, outlier_points_size, /*num_fields=*/8);
+    setUpPointCloudFormat(input, outlier_points, outlier_points_size, /*num_fields=*/4);
     outlier_pointcloud_publisher_->publish(outlier_points);
 
     const auto frequency_image = createBinaryImage(*input);
@@ -411,8 +411,6 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
     if (single_ring.points.empty()) continue;
 
     uint ring_id = single_ring.points.front().ring;
-    std::cerr << "Analyzing ring: " << ring_id << " with points size " << single_ring.points.size()
-              << " points." << std::endl;
     std::vector<int> noise_frequency_in_single_ring(horizontal_bins, 0);
 
     for (const auto & point : single_ring.points) {
