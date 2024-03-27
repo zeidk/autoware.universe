@@ -283,7 +283,6 @@ void RingOutlierFilterComponent::faster_filter(
         outlier_ptr->time_stamp = time_stamp;
 
         outlier_points_size += outlier_points.point_step;
-
       }
     }
   }

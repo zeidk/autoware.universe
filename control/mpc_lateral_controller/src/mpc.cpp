@@ -665,11 +665,6 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   // const int N = m_param.prediction_horizon;
   const double DT = prediction_dt;
 
-  // const int DIM_X = m_vehicle_model_ptr->getDimX();
-  // const int DIM_U = m_vehicle_model_ptr->getDimU();
-  // const int DIM_Y = m_vehicle_model_ptr->getDimY();
-  // const int DIM_U_N = m_param.prediction_horizon * m_vehicle_model_ptr->getDimU();
-
   auto t_start = std::chrono::system_clock::now();
   bool solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex);
   auto t_end = std::chrono::system_clock::now();
