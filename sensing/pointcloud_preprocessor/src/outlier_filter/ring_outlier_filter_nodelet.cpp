@@ -54,21 +54,14 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
       static_cast<size_t>(declare_parameter("max_points_num_per_ring", 4000));
     publish_outlier_pointcloud_ =
       static_cast<bool>(declare_parameter("publish_outlier_pointcloud", false));
-    x_max_ = static_cast<float>(declare_parameter("x_max", 18.0));
-    x_min_ = static_cast<float>(declare_parameter("x_min", -18.0));
-    y_max_ = static_cast<float>(declare_parameter("y_max", -3.0));
-    y_min_ = static_cast<float>(declare_parameter("y_min", -18.0));
-    z_max_ = static_cast<float>(declare_parameter("z_max", 10.0));
-    z_min_ = static_cast<float>(declare_parameter("z_min", 0.0));
 
     min_azimuth_deg_ = static_cast<float>(declare_parameter("min_azimuth_deg", 45.0));
     max_azimuth_deg_ = static_cast<float>(declare_parameter("max_azimuth_deg", 135.0));
     max_distance_ = static_cast<float>(declare_parameter("max_distance", 12.0));
     vertical_bins_ = static_cast<int>(declare_parameter("vertical_bins", 128));
-    max_azimuth_diff_ = static_cast<float>(declare_parameter("max_azimuth_diff", 50.0));
+    horizontal_bins_ = static_cast<int>(declare_parameter("horizontal_bins", 36));
     noise_threshold_ = static_cast<int>(declare_parameter("noise_threshold", 2));
 
-    roi_mode_ = static_cast<std::string>(declare_parameter("roi_mode", "Fixed_azimuth_ROI"));
   }
 
   using std::placeholders::_1;
@@ -93,14 +86,6 @@ void RingOutlierFilterComponent::faster_filter(
   size_t output_size = 0;
 
   pcl::PointCloud<PointXYZIRADRT>::Ptr outlier_pcl(new pcl::PointCloud<PointXYZIRADRT>);
-
-  // Set up the noise points cloud, if noise points are to be published.
-  PointCloud2 outlier_points;
-  size_t outlier_points_size = 0;
-  if (publish_outlier_pointcloud_) {
-    outlier_points.point_step = sizeof(PointXYZIRADRT);
-    outlier_points.data.resize(outlier_points.point_step * input->width);
-  }
 
   const auto ring_offset =
     input->fields.at(static_cast<size_t>(autoware_point_types::PointIndex::Ring)).offset;
@@ -214,8 +199,6 @@ void RingOutlierFilterComponent::faster_filter(
           outlier_point.time_stamp = *reinterpret_cast<const float *>(
             &input->data[indices[walk_first_idx] + time_stamp_offset]);
           outlier_pcl->push_back(outlier_point);
-
-          outlier_points_size += outlier_points.point_step;
         }
       }
 
@@ -273,8 +256,6 @@ void RingOutlierFilterComponent::faster_filter(
         outlier_point.time_stamp =
           *reinterpret_cast<const float *>(&input->data[indices[i] + time_stamp_offset]);
         outlier_pcl->push_back(outlier_point);
-
-        outlier_points_size += outlier_points.point_step;
       }
     }
   }
@@ -288,9 +269,9 @@ void RingOutlierFilterComponent::faster_filter(
     outlier_pointcloud_publisher_->publish(outlier);
 
     const auto frequency_image = createBinaryImage(outlier);
-    const double num_filled_pixels = calculateFilledPixels(frequency_image, vertical_bins_, 36);
-    std::cerr << "num_filled_pixels: " << num_filled_pixels << std::endl;
-    std::cerr << "filled pixel rate: " << 1.0 - num_filled_pixels << std::endl;
+    const double num_filled_pixels =
+      calculateFilledPixels(frequency_image, vertical_bins_, horizontal_bins_);
+    std::cerr << "\n\n\n visibility_score: " << 1.0f - num_filled_pixels << std::endl;
     auto frequency_image_msg = toFrequencyImageMsg(frequency_image);
 
     frequency_image_msg.header = input->header;
@@ -383,20 +364,10 @@ void RingOutlierFilterComponent::setUpPointCloudFormat(
   formatted_points.is_dense = input->is_dense;
 
   sensor_msgs::PointCloud2Modifier pcd_modifier(formatted_points);
-  if (num_fields == 4) {
-    pcd_modifier.setPointCloud2Fields(
-      num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
-      sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-      "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
-  } else {
-    pcd_modifier.setPointCloud2Fields(
-      num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
-      sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-      "intensity", 1, sensor_msgs::msg::PointField::FLOAT32, "ring", 1,
-      sensor_msgs::msg::PointField::UINT16, "azimuth", 1, sensor_msgs::msg::PointField::FLOAT32,
-      "distance", 1, sensor_msgs::msg::PointField::FLOAT32, "return_type", 1,
-      sensor_msgs::msg::PointField::UINT8, "time_stamp", 1, sensor_msgs::msg::PointField::FLOAT64);
-  }
+  pcd_modifier.setPointCloud2Fields(
+    num_fields, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1,
+    sensor_msgs::msg::PointField::FLOAT32, "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+    "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
 }
 
 cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::PointCloud2 & input)
@@ -405,9 +376,9 @@ cv::Mat RingOutlierFilterComponent::createBinaryImage(const sensor_msgs::msg::Po
   pcl::fromROSMsg(input, *input_cloud);
 
   uint32_t vertical_bins = vertical_bins_;
-  uint32_t horizontal_bins = 10;
-  float max_azimuth = (roi_mode_map_[roi_mode_] == 2) ? max_azimuth_deg_ * 100.0 : 36000.0f;
-  float min_azimuth = (roi_mode_map_[roi_mode_] == 2) ? min_azimuth_deg_ * 100.0 : 0.0f;
+  uint32_t horizontal_bins = horizontal_bins_;
+  float max_azimuth = max_azimuth_deg_ * 100.0;
+  float min_azimuth = min_azimuth_deg_ * 100.0;
   // Calculate the resolution of the azimuth
   uint32_t horizontal_resolution =
     static_cast<uint32_t>((max_azimuth - min_azimuth) / horizontal_bins);
@@ -458,17 +429,6 @@ float RingOutlierFilterComponent::calculateFilledPixels(
   float num_filled_pixels =
     static_cast<float>(num_pixels) / static_cast<float>(vertical_bins * horizontal_bins);
   return num_filled_pixels;
-}
-
-void printRingInfo(const pcl::PointCloud<PointXYZIRADRT> & single_ring, int noise_point_idx)
-{
-  std::cerr << "\n[INFO] Noise Point Index: " << noise_point_idx
-            << "\n[INFO] Single Ring Size: " << single_ring.size()
-            << "\n[INFO] Single Ring Point Azimuth: "
-            << static_cast<float>(single_ring.points[noise_point_idx].azimuth)
-            << "\n[INFO] Single Ring Point Distance: "
-            << single_ring.points[noise_point_idx].distance << std::endl;
-  return;
 }
 
 sensor_msgs::msg::Image RingOutlierFilterComponent::toFrequencyImageMsg(

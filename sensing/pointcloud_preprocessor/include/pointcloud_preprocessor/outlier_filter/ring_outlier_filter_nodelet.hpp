@@ -68,24 +68,12 @@ private:
   // for visibility score
   int noise_threshold_;
   int vertical_bins_;
+  int horizontal_bins_;
   float max_azimuth_diff_;
-  std::string roi_mode_;
-  float x_max_;
-  float x_min_;
-  float y_max_;
-  float y_min_;
-  float z_max_;
-  float z_min_;
 
   float min_azimuth_deg_;
   float max_azimuth_deg_;
   float max_distance_;
-
-  std::unordered_map<std::string, uint8_t> roi_mode_map_ = {
-    {"No_ROI", 0},
-    {"Fixed_xyz_ROI", 1},
-    {"Fixed_azimuth_ROI", 2},
-  };
 
   /** \brief Parameter service callback result : needed to be hold */
   OnSetParametersCallbackHandle::SharedPtr set_param_res_;
