@@ -77,7 +77,8 @@ public:
   std::array<double, 3> q = {1.0, 0.1, 0.0};
   std::array<double, 3> q_terminal = {1.0, 0.1, 0.0};
   std::array<double, 3> x_ref = {0, 0, 0};
-  std::array<double, 1> r = {1.0};
+  std::array<double, 1> u_ref = {-0.948853649067464};
+  std::array<double, 1> r = {0.2};
 
   static constexpr std::array<int, 1> ubound_indices = {0};
   std::array<double, 1> umin = {-15.0};
@@ -108,6 +109,8 @@ public:
        << Map<const VectorX>(q_terminal.data(), q_terminal.size()).transpose().format(fmt)
        << std::endl;
     os << "  x_ref: " << Map<const VectorX>(x_ref.data(), x_ref.size()).transpose().format(fmt)
+       << std::endl;
+    os << "  u_ref: " << Map<const VectorX>(u_ref.data(), u_ref.size()).transpose().format(fmt)
        << std::endl;
     os << "  r: " << Map<const VectorX>(r.data(), r.size()).transpose().format(fmt) << std::endl;
     os << std::endl;
@@ -213,7 +216,7 @@ public:
   void eval_hu(
     const double t, const double * x, const double * u, const double * lmd, double * hu) const
   {
-    hu[0] = lmd[2] / tau_ + r[0] * u[0];
+    hu[0] = lmd[2] / tau_ + (1.0 / 2.0) * r[0] * (2 * u[0] - 2 * u_ref[0]);
   }
 
   ///
