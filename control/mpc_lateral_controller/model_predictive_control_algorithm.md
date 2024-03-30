@@ -292,7 +292,7 @@ q_{e}\left(e_{0}^{2} + e_{1}^{2} \right) + q_{\theta}\left(\theta_{0}^{2} + \the
 \end{align}
 $$
 
-This shows that $q_{e}$ is the weight for the lateral error and $q$ is for the angular error. In this example, $q_{e}$ acts as the proportional - P gain and $q_{\theta}$ as the derivative - D gain for the lateral tracking error. The balance of these factors (including R) will be determined through actual experiments.
+This shows that $q_{e}$ is the weight for the lateral error and $q_{\theta}$ is for the angular error. In this example, $q_{e}$ acts as the proportional - P gain and $q_{\theta}$ as the derivative - D gain for the lateral tracking error. The balance of these factors (including R) will be determined through actual experiments.
 
 #### Weight for non-diagonal term
 
