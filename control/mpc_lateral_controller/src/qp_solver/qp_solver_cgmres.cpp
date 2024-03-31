@@ -14,8 +14,6 @@
 
 #include "mpc_lateral_controller/qp_solver/qp_solver_cgmres.hpp"
 
-
-
 #include <Eigen/Dense>
 
 #include <string>
@@ -23,39 +21,29 @@
 
 namespace autoware::motion::control::mpc_lateral_controller
 {
-QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
+QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger)
+: logger_{logger},
+  cgmres_logger_("../log/trajectory_following"),
+  mpc_(
+    ocp_, cgmres::Horizon(0.1, 0.0),
+    settings_),  // Direct initialization of Horizon in the initializer list.
+  initializer_(ocp_, settings_)
 {
-  // Define the solver settings.
+  // Solver settings.
   settings_.sampling_time = 0.03;  // sampling period
   settings_.zeta = 33.3;
   settings_.finite_difference_epsilon = 1e-08;
-  // For initialization.
+  // Initialization settings.
   settings_.max_iter = 50;
   settings_.opterr_tol = 1e-06;
   settings_.verbose_level = 0;
-
-  // // Define the horizon.
-  const double alpha = 0.0;
-  const double prediction_dt = 0.1;
-  cgmres::Horizon horizon(prediction_dt, alpha);
-
-  // Define the C/GMRES solver.
-  constexpr int N = 50;
-  constexpr int kmax = 5;
-  constexpr int kmax_init = 1;
-
-  initializer_ =
-    cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init>(ocp_, settings_);
-
-  mpc_ = cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax>(
-    ocp_, horizon, settings_);
 }
 
 bool QPSolverCGMRES::solveCGMRES(
   const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u,
   const bool warm_start)
 {
-  std::cerr << "prediction_dt: " << prediction_dt <<  std::endl;
+  std::cerr << "prediction_dt: " << prediction_dt << std::endl;
   // // Define the horizon.
   const double alpha = 0.0;
   [[maybe_unused]] cgmres::Horizon horizon(prediction_dt, alpha);
@@ -65,17 +53,35 @@ bool QPSolverCGMRES::solveCGMRES(
   cgmres::Vector<3> x;
   x << x0(0), x0(1), x0(2);
 
-  // Initialize the solution of the C/GMRES method.
-  cgmres::Vector<1> uc0;
-  uc0 << 0.0;
-  initializer_.set_uc(uc0);
-  const double t0 = 0.0;
-  initializer_.solve(t0, x);
-  u = initializer_.uopt();
-  RCLCPP_DEBUG(logger_, "\n\n\n u = %f \n\n\n", u(0));
+  if (warm_start) {
+    const double time_from_last_initialized =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::system_clock::now() - initialized_time_)
+        .count() *
+      1.0e-6;
+    mpc_.update(time_from_last_initialized, x);
+    u = mpc_.uopt()[0];
+    RCLCPP_DEBUG(logger_, "\n\n\n time_from_last_initialized = %e \n", time_from_last_initialized);
+    RCLCPP_DEBUG(logger_, "updated u = %e \n\n\n", mpc_.uopt()[0].value());
+    // cgmres_logger_.save(
+    //   time_from_last_initialized, x, mpc_.uopt()[0], mpc_.uopt(), mpc_.optError(),
+    //   mpc_.normDiff(), mpc_.StandardDeviation());
+  } else {
+    // Initialize the solution of the C/GMRES method.
+    cgmres::Vector<1> uc0;
+    uc0 << 0.0;
+    initializer_.set_uc(uc0);
+    const double t0 = 0.0;
+    initializer_.solve(t0, x);
+    u = initializer_.uopt();
+    initialized_time_ = std::chrono::system_clock::now();
+    mpc_.set_uc(initializer_.ucopt());
+    mpc_.init_dummy_mu();
+    RCLCPP_DEBUG(logger_, "\n\n\n u = %e \n\n\n", u(0));
+  }
 
-  std::cout << "MPC used in this simulation:" << std::endl;
-  std::cout << mpc_ << std::endl;
+  // std::cout << "MPC used in this simulation:" << std::endl;
+  // std::cout << mpc_ << std::endl;
   return true;
 }
 

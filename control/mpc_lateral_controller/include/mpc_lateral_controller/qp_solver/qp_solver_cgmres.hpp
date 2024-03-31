@@ -16,6 +16,7 @@
 #define MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_CGMRES_HPP_
 
 #include "cgmres/horizon.hpp"
+#include "cgmres/logger.hpp"
 #include "cgmres/single_shooting_cgmres_solver.hpp"
 #include "cgmres/solver_settings.hpp"
 #include "cgmres/zero_horizon_ocp_solver.hpp"
@@ -74,11 +75,12 @@ private:
   static constexpr int kmax = 5;       // CGMRESソルバーの最大反復回数
   static constexpr int kmax_init = 1;  // 初期化用ソルバーの最大反復回数
 
+  rclcpp::Logger logger_;
+  cgmres::Logger cgmres_logger_;
   cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc_;
   cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer_;
-
-  rclcpp::Logger logger_;
   bool is_initialized_ = false;
+  std::chrono::time_point<std::chrono::system_clock> initialized_time_;  // Last MPC solution timestamp.
 };
 }  // namespace autoware::motion::control::mpc_lateral_controller
 #endif  // MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_CGMRES_HPP_

@@ -660,7 +660,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   if (0 < elapsed_time_ms && elapsed_time_ms < 150.0) {
     RCLCPP_DEBUG(m_logger, "execute optimization with warm start (CGMRES)");
     warm_start = true;
-  }else {
+  } else {
     RCLCPP_DEBUG(m_logger, "execute optimization without warm start (CGMRES)");
   }
 
