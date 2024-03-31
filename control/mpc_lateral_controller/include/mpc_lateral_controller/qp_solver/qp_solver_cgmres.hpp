@@ -15,7 +15,10 @@
 #ifndef MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_CGMRES_HPP_
 #define MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_CGMRES_HPP_
 
+#include "cgmres/horizon.hpp"
+#include "cgmres/single_shooting_cgmres_solver.hpp"
 #include "cgmres/solver_settings.hpp"
+#include "cgmres/zero_horizon_ocp_solver.hpp"
 #include "mpc_lateral_controller/mpc_cgmres.hpp"
 #include "mpc_lateral_controller/qp_solver/qp_solver_interface.hpp"
 #include "osqp_interface/osqp_interface.hpp"
@@ -55,7 +58,8 @@ public:
     const Eigen::VectorXd & lb, const Eigen::VectorXd & ub, const Eigen::VectorXd & lb_a,
     const Eigen::VectorXd & ub_a, Eigen::VectorXd & u) override;
   bool solveCGMRES(
-    const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u) override;
+    const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u,
+    const bool warm_start) override;
 
   int64_t getTakenIter() const override { return cgmressolver_.getTakenIter(); }
   double getRunTime() const override { return cgmressolver_.getRunTime(); }
@@ -65,6 +69,13 @@ private:
   autoware::common::osqp::OSQPInterface cgmressolver_;
   cgmres::OCP_lateral_control ocp_;
   cgmres::SolverSettings settings_;
+
+  static constexpr int N = 50;         // CGMRESソルバーの予測ステップ数
+  static constexpr int kmax = 5;       // CGMRESソルバーの最大反復回数
+  static constexpr int kmax_init = 1;  // 初期化用ソルバーの最大反復回数
+
+  cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc_;
+  cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer_;
 
   rclcpp::Logger logger_;
   bool is_initialized_ = false;

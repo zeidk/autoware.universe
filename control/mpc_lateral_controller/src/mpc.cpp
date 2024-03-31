@@ -90,27 +90,12 @@ bool MPC::calculateMPC(
   }
 
   if (qp_solver_type == "cgmres") {
+    std::tie(success_opt, Uex) = executeOptimization(
+      x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+      current_kinematics.twist.twist.linear.x);
     // std::cerr << "current kinematics position: \n x: " << current_kinematics.pose.pose.position.x
     //           << " y: " << current_kinematics.pose.pose.position.y
     //           << " at frame ID: " << current_kinematics.header.frame_id << std::endl;
-    const double elapsed_time_ms =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::system_clock::now() - m_previous_optimal_solution_time)
-        .count() *
-      1.0e-6;
-    std::cerr << "time from last optimal solution [ms]: " << elapsed_time_ms << std::endl;
-    if (0 < elapsed_time_ms && elapsed_time_ms < 50.0) {
-      RCLCPP_DEBUG(m_logger, "execute optimization with warm start (CGMRES)");
-
-      // std::tie(success_opt, Uex) = executeOptimization(
-      //   x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
-      //   current_kinematics.twist.twist.linear.x);
-    } else {
-      RCLCPP_DEBUG(m_logger, "execute optimization without warm start (CGMRES)");
-      std::tie(success_opt, Uex) = executeOptimization(
-        x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
-        current_kinematics.twist.twist.linear.x);
-    }
 
   } else {
     // solve Optimization problem
@@ -118,12 +103,7 @@ bool MPC::calculateMPC(
       mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
       current_kinematics.twist.twist.linear.x);
   }
-  if (success_opt) {
-    m_previous_optimal_solution_time = std::chrono::system_clock::now();
-    // auto now_c = std::chrono::system_clock::to_time_t(m_previous_optimal_solution_time);
-    // std::cerr << "Current time: " << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S")
-    //           << std::endl;
-  } else {
+  if (!success_opt) {
     return fail_warn_throttle("optimization failed. Stop MPC.");
   }
 
@@ -663,28 +643,43 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   const VectorXd & x0, const double prediction_dt, const MPCTrajectory & traj,
   const double current_velocity)
 {
-  VectorXd Uex;
-
   // const int N = m_param.prediction_horizon;
   const double DT = prediction_dt;
+  VectorXd Uex;
+  const double elapsed_time_ms =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::system_clock::now() - m_previous_optimal_solution_time)
+      .count() *
+    1.0e-6;
+  std::cerr << "time from last optimal solution [ms]: " << elapsed_time_ms << std::endl;
 
   auto t_start = std::chrono::system_clock::now();
-  bool solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex);
+  bool solve_result = false;
+  bool warm_start = false;
+
+  if (0 < elapsed_time_ms && elapsed_time_ms < 150.0) {
+    RCLCPP_DEBUG(m_logger, "execute optimization with warm start (CGMRES)");
+    warm_start = true;
+  }else {
+    RCLCPP_DEBUG(m_logger, "execute optimization without warm start (CGMRES)");
+  }
+
+  solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex, warm_start);
   auto t_end = std::chrono::system_clock::now();
+
   if (!solve_result) {
     warn_throttle("qp solver error");
     return {false, {}};
   }
 
-  {
-    auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
-    RCLCPP_DEBUG(m_logger, "cgmres solver calculation time = %ld [ms]", t);
-  }
+  auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+  RCLCPP_DEBUG(m_logger, "cgmres solver calculation time = %ld [ms]", t);
 
   if (Uex.array().isNaN().any()) {
     warn_throttle("model Uex includes NaN, stop MPC.");
     return {false, {}};
   }
+  m_previous_optimal_solution_time = std::chrono::system_clock::now();
   return {true, Uex};
 }
 

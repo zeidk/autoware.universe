@@ -16,6 +16,7 @@
 #define TRAJECTORY_FOLLOWER_TEST_UTILS_HPP_
 
 #include "fake_test_node/fake_test_node.hpp"
+#include "motion_utils/trajectory/conversion.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp/time.hpp"
 #include "tf2_ros/static_transform_broadcaster.h"
@@ -28,13 +29,15 @@
 namespace test_utils
 {
 using FakeNodeFixture = autoware::tools::testing::FakeTestNode;
+using TrajectoryPointArray = std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint>;
+using autoware_auto_planning_msgs::msg::TrajectoryPoint;
 
 inline void waitForMessage(
   const std::shared_ptr<rclcpp::Node> & node, FakeNodeFixture * fixture, const bool & received_flag,
   const std::chrono::duration<int> max_wait_time = std::chrono::seconds{10LL},
   const bool fail_on_timeout = true)
 {
-  const auto dt{std::chrono::milliseconds{100LL}};
+  const auto dt{std::chrono::milliseconds{30LL}};
   auto time_passed{std::chrono::milliseconds{0LL}};
   while (!received_flag) {
     rclcpp::spin_some(node);
@@ -66,6 +69,32 @@ inline geometry_msgs::msg::TransformStamped getDummyTransform()
   transform_stamped.header.frame_id = "map";
   transform_stamped.child_frame_id = "base_link";
   return transform_stamped;
+}
+
+inline TrajectoryPoint make_traj_point(const double px, const double py, const float vx)
+{
+  TrajectoryPoint p;
+  p.pose.position.x = px;
+  p.pose.position.y = py;
+  p.longitudinal_velocity_mps = vx;
+  return p;
+}
+
+inline autoware_auto_planning_msgs::msg::Trajectory generateRightTurnTrajectory(std_msgs::msg::Header header)
+{
+  TrajectoryPointArray trajectory;
+
+  trajectory.push_back(make_traj_point(-2.0, -2.0, 1.0f));
+  trajectory.push_back(make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
+  trajectory.push_back(make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
+  trajectory.push_back(make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
+  trajectory.push_back(make_traj_point(0.0, 0.0, 1.0f));
+  trajectory.push_back(make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
+  trajectory.push_back(make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
+  trajectory.push_back(make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
+  trajectory.push_back(make_traj_point(2.0, -2.0, 1.0f));
+
+  return motion_utils::convertToTrajectory(trajectory, header);
 }
 
 // TODO(Horibe): modify the controller nodes so that they does not publish topics when data is not

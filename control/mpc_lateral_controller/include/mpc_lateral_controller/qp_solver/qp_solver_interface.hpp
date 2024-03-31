@@ -59,7 +59,8 @@ public:
    * @return true if the problem was solved
    */
   virtual bool solveCGMRES(
-    const Eigen::VectorXd & /* x0 */, const double /*prediction_dt */, Eigen::VectorXd & /*u*/)
+    const Eigen::VectorXd & /* x0 */, const double /*prediction_dt */, Eigen::VectorXd & /*u*/,
+    const bool /* warm_start */)
   {
     return false;
   }

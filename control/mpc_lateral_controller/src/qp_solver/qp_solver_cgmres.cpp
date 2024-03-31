@@ -14,9 +14,7 @@
 
 #include "mpc_lateral_controller/qp_solver/qp_solver_cgmres.hpp"
 
-#include "cgmres/horizon.hpp"
-#include "cgmres/single_shooting_cgmres_solver.hpp"
-#include "cgmres/zero_horizon_ocp_solver.hpp"
+
 
 #include <Eigen/Dense>
 
@@ -35,20 +33,32 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
   settings_.max_iter = 50;
   settings_.opterr_tol = 1e-06;
   settings_.verbose_level = 0;
-}
 
-bool QPSolverCGMRES::solveCGMRES(
-  const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u)
-{
   // // Define the horizon.
   const double alpha = 0.0;
+  const double prediction_dt = 0.1;
   cgmres::Horizon horizon(prediction_dt, alpha);
 
   // Define the C/GMRES solver.
   constexpr int N = 50;
   constexpr int kmax = 5;
-  cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc(
+  constexpr int kmax_init = 1;
+
+  initializer_ =
+    cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init>(ocp_, settings_);
+
+  mpc_ = cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax>(
     ocp_, horizon, settings_);
+}
+
+bool QPSolverCGMRES::solveCGMRES(
+  const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u,
+  const bool warm_start)
+{
+  std::cerr << "prediction_dt: " << prediction_dt <<  std::endl;
+  // // Define the horizon.
+  const double alpha = 0.0;
+  [[maybe_unused]] cgmres::Horizon horizon(prediction_dt, alpha);
 
   // Define the initial time and initial state.
   // state は 横偏差、ヨー角、ステアリング角度の3つ
@@ -56,18 +66,16 @@ bool QPSolverCGMRES::solveCGMRES(
   x << x0(0), x0(1), x0(2);
 
   // Initialize the solution of the C/GMRES method.
-  constexpr int kmax_init = 1;
-  cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer(ocp_, settings_);
   cgmres::Vector<1> uc0;
   uc0 << 0.0;
-  initializer.set_uc(uc0);
+  initializer_.set_uc(uc0);
   const double t0 = 0.0;
-  initializer.solve(t0, x);
-  u = initializer.uopt();
-  RCLCPP_DEBUG(logger_, "u = %f", u(0));
+  initializer_.solve(t0, x);
+  u = initializer_.uopt();
+  RCLCPP_DEBUG(logger_, "\n\n\n u = %f \n\n\n", u(0));
 
-  // std::cout << "MPC used in this simulation:" << std::endl;
-  // std::cout << mpc << std::endl;
+  std::cout << "MPC used in this simulation:" << std::endl;
+  std::cout << mpc_ << std::endl;
   return true;
 }
 

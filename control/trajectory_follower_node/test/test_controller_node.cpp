@@ -254,15 +254,6 @@ public:
     std::make_shared<tf2_ros::StaticTransformBroadcaster>(fnf->get_fake_node());
 };
 
-TrajectoryPoint make_traj_point(const double px, const double py, const float vx)
-{
-  TrajectoryPoint p;
-  p.pose.position.x = px;
-  p.pose.position.y = py;
-  p.longitudinal_velocity_mps = vx;
-  return p;
-}
-
 // TEST_F(FakeNodeFixture, no_input)
 // {
 //   const auto node_options = makeNodeOptions();
@@ -308,10 +299,10 @@ TrajectoryPoint make_traj_point(const double px, const double py, const float vx
 //   Trajectory traj_msg;
 //   traj_msg.header.stamp = tester.node->now();
 //   traj_msg.header.frame_id = "map";
-//   traj_msg.points.push_back(make_traj_point(-1.0, 0.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(1.0, 0.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(2.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(-1.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(1.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(2.0, 0.0, 1.0f));
 //   tester.traj_pub->publish(traj_msg);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -338,15 +329,21 @@ TEST_F(FakeNodeFixture, right_turn)
   Trajectory traj_msg;
   traj_msg.header.stamp = tester.node->now();
   traj_msg.header.frame_id = "map";
-  traj_msg.points.push_back(make_traj_point(-2.0, -2.0, 1.0f));
-  traj_msg.points.push_back(make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
-  traj_msg.points.push_back(make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
-  traj_msg.points.push_back(make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
-  traj_msg.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-  traj_msg.points.push_back(make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
-  traj_msg.points.push_back(make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
-  traj_msg.points.push_back(make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
-  traj_msg.points.push_back(make_traj_point(2.0, -2.0, 1.0f));
+  traj_msg.points.push_back(test_utils::make_traj_point(-2.0, -2.0, 1.0f));
+  traj_msg.points.push_back(
+    test_utils::make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
+  traj_msg.points.push_back(
+    test_utils::make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
+  traj_msg.points.push_back(
+    test_utils::make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
+  traj_msg.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+  traj_msg.points.push_back(
+    test_utils::make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
+  traj_msg.points.push_back(
+    test_utils::make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
+  traj_msg.points.push_back(
+    test_utils::make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
+  traj_msg.points.push_back(test_utils::make_traj_point(2.0, -2.0, 1.0f));
   tester.traj_pub->publish(traj_msg);
 
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -381,26 +378,22 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 
     // Right turning trajectory with a constant curvature of -0.5: expect right steering
 
-    traj_msg.header.stamp = tester.node->now();
-    traj_msg.header.frame_id = "map";
-    traj_msg.points.clear();
-    traj_msg.points.push_back(make_traj_point(-2.0, -2.0, 1.0f));
-    traj_msg.points.push_back(make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
-    traj_msg.points.push_back(make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
-    traj_msg.points.push_back(make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
-    traj_msg.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-    traj_msg.points.push_back(make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
-    traj_msg.points.push_back(make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
-    traj_msg.points.push_back(make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
-    traj_msg.points.push_back(make_traj_point(2.0, -2.0, 1.0f));
+    std_msgs::msg::Header header;
+    header.stamp = tester.node->now();
+    header.frame_id = "map";
+    traj_msg = test_utils::generateRightTurnTrajectory(header);
     tester.traj_pub->publish(traj_msg);
   };
 
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
+    const auto start_time = std::chrono::system_clock::now();
     publishTrajectory();
+    const auto after_publish_time = std::chrono::system_clock::now();
 
     test_utils::waitForMessage(tester.node, this, tester.received_control_command);
+    const auto after_spin_time = std::chrono::system_clock::now();
+
     ASSERT_TRUE(tester.received_control_command);
     std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle
               << std::endl;
@@ -408,6 +401,19 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
               << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
     EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
     EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
+    const auto last_time = std::chrono::system_clock::now();
+    const double publish_time_ms =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(after_publish_time - start_time)
+        .count() *
+      1.0e-6;
+    const double spin_time_ms =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(after_spin_time - after_publish_time)
+        .count() *
+      1.0e-6;
+    const double total_time_ms =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(last_time - start_time).count() * 1.0e-6;
+    std::cerr << "Total time = " << total_time_ms << "ms\n\tpublish = " << publish_time_ms
+              << "ms\n\tspin = " << spin_time_ms << "ms\n";
   }
 
   // ASSERT_TRUE(tester.received_resampled_reference_trajectory);
@@ -435,10 +441,10 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj_msg;
 //   traj_msg.header.stamp = tester.node->now();
 //   traj_msg.header.frame_id = "map";
-//   traj_msg.points.push_back(make_traj_point(-1.0, 1.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(1.0, 1.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(2.0, 2.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(-1.0, 1.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(1.0, 1.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(2.0, 2.0, 1.0f));
 //   tester.traj_pub->publish(traj_msg);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -468,10 +474,10 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj_msg;
 //   traj_msg.header.stamp = tester.node->now();
 //   traj_msg.header.frame_id = "map";
-//   traj_msg.points.push_back(make_traj_point(-1.0, 0.0, 0.0f));
-//   traj_msg.points.push_back(make_traj_point(0.0, 0.0, 0.0f));
-//   traj_msg.points.push_back(make_traj_point(1.0, 0.0, 0.0f));
-//   traj_msg.points.push_back(make_traj_point(2.0, 0.0, 0.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(-1.0, 0.0, 0.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(0.0, 0.0, 0.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(1.0, 0.0, 0.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(2.0, 0.0, 0.0f));
 //   tester.traj_pub->publish(traj_msg);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -497,9 +503,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj_msg;
 //   traj_msg.header.stamp = tester.node->now();
 //   traj_msg.header.frame_id = "map";
-//   traj_msg.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(50.0, 0.0, 1.0f));
-//   traj_msg.points.push_back(make_traj_point(100.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(50.0, 0.0, 1.0f));
+//   traj_msg.points.push_back(test_utils::make_traj_point(100.0, 0.0, 1.0f));
 //   tester.traj_pub->publish(traj_msg);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -534,9 +540,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(0.0, 0.0, 0.5f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, 0.5f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, 0.5f));
+//   traj.points.push_back(test_utils::make_traj_point(0.0, 0.0, 0.5f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, 0.5f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, 0.5f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -571,9 +577,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, 1.0f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -605,9 +611,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(0.0, 0.0, 0.0f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, 0.0f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, 0.0f));
+//   traj.points.push_back(test_utils::make_traj_point(0.0, 0.0, 0.0f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, 0.0f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, 0.0f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -635,9 +641,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(0.0, 0.0, -1.0f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, -1.0f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, -1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(0.0, 0.0, -1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, -1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, -1.0f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -662,9 +668,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(10.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(10.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, 1.0f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -693,9 +699,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, 1.0f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -724,9 +730,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 //   Trajectory traj;
 //   traj.header.stamp = tester.node->now();
 //   traj.header.frame_id = "map";
-//   traj.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(50.0, 0.0, 1.0f));
-//   traj.points.push_back(make_traj_point(100.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(50.0, 0.0, 1.0f));
+//   traj.points.push_back(test_utils::make_traj_point(100.0, 0.0, 1.0f));
 //   tester.traj_pub->publish(traj);
 
 //   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
