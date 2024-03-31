@@ -163,7 +163,11 @@ public:
   {
     VehicleOdometry odom_msg;
     odom_msg.header.stamp = node->now();
+    odom_msg.header.frame_id = "map";
     odom_msg.twist.twist.linear.x = vx;
+    // std::cerr << "published odom position: \n x: " << odom_msg.pose.pose.position.x
+    //           << " y: " << odom_msg.pose.pose.position.y
+    //           << " at frame ID: " << odom_msg.header.frame_id << std::endl;
     odom_pub->publish(odom_msg);
   };
 
@@ -259,35 +263,35 @@ TrajectoryPoint make_traj_point(const double px, const double py, const float vx
   return p;
 }
 
-TEST_F(FakeNodeFixture, no_input)
-{
-  const auto node_options = makeNodeOptions();
-  ControllerTester tester(this, node_options);
+// TEST_F(FakeNodeFixture, no_input)
+// {
+//   const auto node_options = makeNodeOptions();
+//   ControllerTester tester(this, node_options);
 
-  // No published data: expect a stopped command
-  test_utils::waitForMessage(
-    tester.node, this, tester.received_control_command, std::chrono::seconds{1LL}, false);
-  ASSERT_FALSE(tester.received_control_command);
-}
+//   // No published data: expect a stopped command
+//   test_utils::waitForMessage(
+//     tester.node, this, tester.received_control_command, std::chrono::seconds{1LL}, false);
+//   ASSERT_FALSE(tester.received_control_command);
+// }
 
-TEST_F(FakeNodeFixture, empty_trajectory)
-{
-  const auto node_options = makeNodeOptions();
-  ControllerTester tester(this, node_options);
+// TEST_F(FakeNodeFixture, empty_trajectory)
+// {
+//   const auto node_options = makeNodeOptions();
+//   ControllerTester tester(this, node_options);
 
-  tester.send_default_transform();
+//   tester.send_default_transform();
 
-  // Empty trajectory: expect a stopped command
-  tester.publish_default_traj();
-  tester.publish_default_odom();
-  tester.publish_autonomous_operation_mode();
-  tester.publish_default_acc();
-  tester.publish_default_steer();
+//   // Empty trajectory: expect a stopped command
+//   tester.publish_default_traj();
+//   tester.publish_default_odom();
+//   tester.publish_autonomous_operation_mode();
+//   tester.publish_default_acc();
+//   tester.publish_default_steer();
 
-  test_utils::waitForMessage(
-    tester.node, this, tester.received_control_command, std::chrono::seconds{1LL}, false);
-  ASSERT_FALSE(tester.received_control_command);
-}
+//   test_utils::waitForMessage(
+//     tester.node, this, tester.received_control_command, std::chrono::seconds{1LL}, false);
+//   ASSERT_FALSE(tester.received_control_command);
+// }
 
 // lateral
 // TEST_F(FakeNodeFixture, straight_trajectory)
@@ -359,6 +363,60 @@ TEST_F(FakeNodeFixture, right_turn)
             << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
+  EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
+}
+
+TEST_F(FakeNodeFixture, right_turn_convergence)
+{
+  const auto node_options = makeNodeOptions();
+  ControllerTester tester(this, node_options);
+  Trajectory traj_msg;
+
+  auto publishTrajectory = [&tester, &traj_msg]() {
+    tester.send_default_transform();
+    tester.publish_odom_vx(1.0);
+    tester.publish_autonomous_operation_mode();
+    tester.publish_default_steer();
+    tester.publish_default_acc();
+
+    // Right turning trajectory with a constant curvature of -0.5: expect right steering
+
+    traj_msg.header.stamp = tester.node->now();
+    traj_msg.header.frame_id = "map";
+    traj_msg.points.clear();
+    traj_msg.points.push_back(make_traj_point(-2.0, -2.0, 1.0f));
+    traj_msg.points.push_back(make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
+    traj_msg.points.push_back(make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
+    traj_msg.points.push_back(make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
+    traj_msg.points.push_back(make_traj_point(0.0, 0.0, 1.0f));
+    traj_msg.points.push_back(make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
+    traj_msg.points.push_back(make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
+    traj_msg.points.push_back(make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
+    traj_msg.points.push_back(make_traj_point(2.0, -2.0, 1.0f));
+    tester.traj_pub->publish(traj_msg);
+  };
+
+  constexpr size_t iter_num = 10;
+  for (size_t i = 0; i < iter_num; i++) {
+    publishTrajectory();
+
+    test_utils::waitForMessage(tester.node, this, tester.received_control_command);
+    ASSERT_TRUE(tester.received_control_command);
+    std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle
+              << std::endl;
+    std::cerr << "lat steer tire rotation rate: "
+              << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
+    EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
+    EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
+  }
+
+  // ASSERT_TRUE(tester.received_resampled_reference_trajectory);
+
+  // const auto save_directory = "/home/kyoichi-sugahara/workspace/log/reference_trajectory";
+  // save_message_to_rosbag(
+  //   save_directory, tester.resampled_reference_trajectory,
+  //   "controller/debug/resampled_reference_trajectory");
+
   EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
 }
 

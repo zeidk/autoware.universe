@@ -90,6 +90,9 @@ bool MPC::calculateMPC(
   }
 
   if (qp_solver_type == "cgmres") {
+    // std::cerr << "current kinematics position: \n x: " << current_kinematics.pose.pose.position.x
+    //           << " y: " << current_kinematics.pose.pose.position.y
+    //           << " at frame ID: " << current_kinematics.header.frame_id << std::endl;
     const double elapsed_time_ms =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::system_clock::now() - m_previous_optimal_solution_time)
