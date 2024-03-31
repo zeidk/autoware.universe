@@ -28,13 +28,13 @@ namespace autoware::motion::control::mpc_lateral_controller
 QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger) : logger_{logger}
 {
   // Define the solver settings.
-  settings_.sampling_time = 0.001;  // sampling period
-  settings_.zeta = 1000;
+  settings_.sampling_time = 0.03;  // sampling period
+  settings_.zeta = 33.3;
   settings_.finite_difference_epsilon = 1e-08;
   // For initialization.
   settings_.max_iter = 50;
   settings_.opterr_tol = 1e-06;
-  settings_.verbose_level = 2;
+  settings_.verbose_level = 0;
 }
 
 bool QPSolverCGMRES::solveCGMRES(
@@ -56,17 +56,18 @@ bool QPSolverCGMRES::solveCGMRES(
   x << x0(0), x0(1), x0(2);
 
   // Initialize the solution of the C/GMRES method.
-  constexpr int kmax_init = 10;
+  constexpr int kmax_init = 1;
   cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer(ocp_, settings_);
   cgmres::Vector<1> uc0;
   uc0 << 0.0;
   initializer.set_uc(uc0);
   const double t0 = 0.0;
   initializer.solve(t0, x);
-  // const double ucopt = initializer.ucopt();
   u = initializer.uopt();
-  // RCLCPP_DEBUG(logger_, "ucopt = %f", ucopt);
   RCLCPP_DEBUG(logger_, "u = %f", u(0));
+
+  // std::cout << "MPC used in this simulation:" << std::endl;
+  // std::cout << mpc << std::endl;
   return true;
 }
 
