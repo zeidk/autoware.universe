@@ -55,8 +55,8 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     publish_outlier_pointcloud_ =
       static_cast<bool>(declare_parameter("publish_outlier_pointcloud", false));
 
-    min_azimuth_deg_ = static_cast<float>(declare_parameter("min_azimuth_deg", 45.0));
-    max_azimuth_deg_ = static_cast<float>(declare_parameter("max_azimuth_deg", 135.0));
+    min_azimuth_deg_ = static_cast<float>(declare_parameter("min_azimuth_deg", 0.0));
+    max_azimuth_deg_ = static_cast<float>(declare_parameter("max_azimuth_deg", 360.0));
     max_distance_ = static_cast<float>(declare_parameter("max_distance", 12.0));
     vertical_bins_ = static_cast<int>(declare_parameter("vertical_bins", 128));
     horizontal_bins_ = static_cast<int>(declare_parameter("horizontal_bins", 36));
