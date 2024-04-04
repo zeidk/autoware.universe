@@ -15,6 +15,7 @@
 #include "perception_online_evaluator/metrics_calculator.hpp"
 
 #include "motion_utils/trajectory/trajectory.hpp"
+#include "object_recognition_utils/object_classification.hpp"
 #include "object_recognition_utils/object_recognition_utils.hpp"
 #include "tier4_autoware_utils/geometry/geometry.hpp"
 
@@ -58,6 +59,8 @@ std::optional<MetricStatMap> MetricsCalculator::calculate(const Metric & metric)
       return calcPredictedPathDeviationMetrics(class_moving_objects_map);
     case Metric::yaw_rate:
       return calcYawRateMetrics(class_stopped_objects_map);
+    case Metric::number_of_unknown_objects:
+      return calcNumOfUnknownObjectsMetrics(target_stamp_objects);
     default:
       return {};
   }
@@ -391,6 +394,27 @@ MetricStatMap MetricsCalculator::calcYawRateMetrics(const ClassObjectsMap & clas
     }
     metric_stat_map["yaw_rate_" + convertLabelToString(label)] = stat;
   }
+  return metric_stat_map;
+}
+
+MetricStatMap MetricsCalculator::calcNumOfUnknownObjectsMetrics(
+  const PredictedObjects & objects) const
+{
+  MetricStatMap metric_stat_map{};
+  int unknown_objects_count = 0;
+
+  for (const auto & object : objects.objects) {
+    if (
+      object_recognition_utils::getHighestProbLabel(object.classification) ==
+      ObjectClassification::UNKNOWN) {
+      ++unknown_objects_count;
+    }
+  }
+
+  Stat<double> stat{};
+  stat.add(static_cast<double>(unknown_objects_count));
+
+  metric_stat_map["number_of_unknown_objects"] = stat;
   return metric_stat_map;
 }
 

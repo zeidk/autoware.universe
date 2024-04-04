@@ -129,6 +129,7 @@ private:
   Stat<double> calcPredictedPathDeviationMetrics(
     const PredictedObjects & objects, const double time_horizon) const;
   MetricStatMap calcYawRateMetrics(const ClassObjectsMap & class_objects_map) const;
+  MetricStatMap calcNumOfUnknownObjectsMetrics(const PredictedObjects & objects) const;
 
   bool hasPassedTime(const rclcpp::Time stamp) const;
   bool hasPassedTime(const std::string uuid, const rclcpp::Time stamp) const;
