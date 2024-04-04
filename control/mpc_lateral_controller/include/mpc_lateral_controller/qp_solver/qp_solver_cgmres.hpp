@@ -80,7 +80,8 @@ private:
   cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc_;
   cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer_;
   bool is_initialized_ = false;
-  std::chrono::time_point<std::chrono::system_clock> initialized_time_;  // Last MPC solution timestamp.
+  std::chrono::time_point<std::chrono::system_clock>
+    initialized_time_;  // First MPC solution timestamp.
 };
 }  // namespace autoware::motion::control::mpc_lateral_controller
 #endif  // MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_CGMRES_HPP_

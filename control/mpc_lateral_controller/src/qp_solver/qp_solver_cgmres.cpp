@@ -74,7 +74,10 @@ bool QPSolverCGMRES::solveCGMRES(
     const double t0 = 0.0;
     initializer_.solve(t0, x);
     u = initializer_.uopt();
-    initialized_time_ = std::chrono::system_clock::now();
+    if (!is_initialized_) {
+      initialized_time_ = std::chrono::system_clock::now();
+      is_initialized_ = true;
+    }
     mpc_.set_uc(initializer_.ucopt());
     mpc_.init_dummy_mu();
     RCLCPP_DEBUG(logger_, "\n\n\n u = %e \n\n\n", u(0));
