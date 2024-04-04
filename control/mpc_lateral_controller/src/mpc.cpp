@@ -640,7 +640,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
  *
  */
 std::pair<bool, VectorXd> MPC::executeOptimization(
-  const VectorXd & x0, const double prediction_dt, const MPCTrajectory & traj,
+  const VectorXd & x0, const double prediction_dt, const MPCTrajectory & resampled_ref_trajectory,
   const double current_velocity)
 {
   // const int N = m_param.prediction_horizon;
