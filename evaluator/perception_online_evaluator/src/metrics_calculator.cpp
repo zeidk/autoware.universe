@@ -59,8 +59,8 @@ std::optional<MetricStatMap> MetricsCalculator::calculate(const Metric & metric)
       return calcPredictedPathDeviationMetrics(class_moving_objects_map);
     case Metric::yaw_rate:
       return calcYawRateMetrics(class_stopped_objects_map);
-    case Metric::number_of_unknown_objects:
-      return calcNumOfUnknownObjectsMetrics(target_stamp_objects);
+    case Metric::objects_count:
+      return calcObjectsCountMetrics(target_stamp_objects);
     default:
       return {};
   }
@@ -402,24 +402,22 @@ MetricStatMap MetricsCalculator::calcYawRateMetrics(const ClassObjectsMap & clas
   return metric_stat_map;
 }
 
-MetricStatMap MetricsCalculator::calcNumOfUnknownObjectsMetrics(
-  const PredictedObjects & objects) const
+MetricStatMap MetricsCalculator::calcObjectsCountMetrics(const PredictedObjects & objects) const
 {
   MetricStatMap metric_stat_map{};
-  int unknown_objects_count = 0;
+  std::unordered_map<std::string, int> local_count_map;
 
-  for (const auto & object : objects.objects) {
-    if (
-      object_recognition_utils::getHighestProbLabel(object.classification) ==
-      ObjectClassification::UNKNOWN) {
-      ++unknown_objects_count;
-    }
+  for (const auto & object : objects) {
+    const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
+    local_count_map[label]++;
   }
 
-  Stat<double> stat{};
-  stat.add(static_cast<double>(unknown_objects_count));
+  for (const auto & [label, count] : local_count_map) {
+    Stat<double> stat;
+    stat.add(static_cast<double>(count));
+    metric_stat_map["objects_count_" + convertLabelToString(label)] = stat;
+  }
 
-  metric_stat_map["number_of_unknown_objects"] = stat;
   return metric_stat_map;
 }
 

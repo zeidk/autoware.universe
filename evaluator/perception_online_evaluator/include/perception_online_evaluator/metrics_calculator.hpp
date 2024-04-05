@@ -104,6 +104,7 @@ private:
   // Store predicted objects information and calculation results
   ObjectMap object_map_;
   HistoryPathMap history_path_map_;
+  std::unordered_map<std::uint8_t, int> detection_count_map_;
 
   rclcpp::Time current_stamp_;
 
@@ -129,7 +130,7 @@ private:
   Stat<double> calcPredictedPathDeviationMetrics(
     const PredictedObjects & objects, const double time_horizon) const;
   MetricStatMap calcYawRateMetrics(const ClassObjectsMap & class_objects_map) const;
-  MetricStatMap calcNumOfUnknownObjectsMetrics(const PredictedObjects & objects) const;
+  MetricStatMap calcObjectsCountMetrics(const PredictedObjects & objects) const;
 
   bool hasPassedTime(const rclcpp::Time stamp) const;
   bool hasPassedTime(const std::string uuid, const rclcpp::Time stamp) const;
