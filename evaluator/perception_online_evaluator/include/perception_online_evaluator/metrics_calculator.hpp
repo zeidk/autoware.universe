@@ -20,6 +20,7 @@
 #include "perception_online_evaluator/parameters.hpp"
 #include "perception_online_evaluator/stat.hpp"
 #include "perception_online_evaluator/utils/objects_filtering.hpp"
+#include "tf2_ros/buffer.h"
 
 #include <rclcpp/time.hpp>
 
@@ -99,7 +100,7 @@ public:
    */
   void setPredictedObjects(const PredictedObjects & objects);
 
-  void updateObjectsCountMap(const PredictedObjects & objects);
+  void updateObjectsCountMap(const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer);
 
   HistoryPathMap getHistoryPathMap() const { return history_path_map_; }
   ObjectDataMap getDebugObjectData() const { return debug_target_object_; }

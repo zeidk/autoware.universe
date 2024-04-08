@@ -112,7 +112,7 @@ DiagnosticStatus PerceptionOnlineEvaluatorNode::generateDiagnosticStatus(
 void PerceptionOnlineEvaluatorNode::onObjects(const PredictedObjects::ConstSharedPtr objects_msg)
 {
   metrics_calculator_.setPredictedObjects(*objects_msg);
-  metrics_calculator_.updateObjectsCountMap(*objects_msg);
+  metrics_calculator_.updateObjectsCountMap(*objects_msg, *tf_buffer_);
   publishMetrics();
 }
 

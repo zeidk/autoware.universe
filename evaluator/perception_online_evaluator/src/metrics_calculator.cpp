@@ -435,11 +435,48 @@ void MetricsCalculator::setPredictedObjects(const PredictedObjects & objects)
   }
 }
 
-void MetricsCalculator::updateObjectsCountMap(const PredictedObjects & objects)
+void MetricsCalculator::updateObjectsCountMap(
+  const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer)
 {
+  const auto objects_frame_id = objects.header.frame_id;
+  std::cerr << "[perception_online_evaluator] Frame ID: " << objects_frame_id << std::endl;
+
+  geometry_msgs::msg::TransformStamped transform_stamped;
+  try {
+    transform_stamped = tf_buffer.lookupTransform(
+      "base_link", objects_frame_id, tf2::TimePointZero, tf2::durationFromSec(1.0));
+  } catch (const tf2::TransformException & ex) {
+    std::cerr << "[perception_online_evaluator] Failed to get transform from '" << objects_frame_id
+              << "' to 'base_link': " << ex.what() << std::endl;
+    return;
+  }
+
   for (const auto & object : objects.objects) {
     const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
-    historical_detection_count_map_[label]++;
+    std::cerr << "[perception_online_evaluator] Label: " << convertLabelToString(label)
+              << std::endl;
+
+    geometry_msgs::msg::PoseStamped pose_in, pose_out;
+    pose_in.header.frame_id = objects_frame_id;
+    pose_in.pose = object.kinematics.initial_pose_with_covariance.pose;
+
+    // Transform the object's pose into the 'base_link' coordinate frame
+    tf2::doTransform(pose_in, pose_out, transform_stamped);
+
+    const double distance_to_pose = std::hypot(pose_out.pose.position.x, pose_out.pose.position.y);
+
+    // If the pose is within the detection_range and below a cdetection_height, increment the count
+    if (
+      distance_to_pose < parameters_->detection_range &&
+      pose_out.pose.position.z < parameters_->detection_height) {
+      historical_detection_count_map_[label]++;
+    }
+
+    // Output the object's position in the 'base_link' coordinate frame
+    std::cerr << "[perception_online_evaluator] Object in 'base_link': x="
+              << pose_out.pose.position.x << ", y=" << pose_out.pose.position.y
+              << ", z=" << pose_out.pose.position.z << std::endl;
+    std::cerr << "[perception_online_evaluator] distance_to_pose=" << distance_to_pose << std::endl;
   }
 }
 
