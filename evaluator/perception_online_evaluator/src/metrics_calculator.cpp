@@ -405,9 +405,9 @@ MetricStatMap MetricsCalculator::calcYawRateMetrics(const ClassObjectsMap & clas
 MetricStatMap MetricsCalculator::calcObjectsCountMetrics(const PredictedObjects & objects) const
 {
   MetricStatMap metric_stat_map{};
-  std::unordered_map<std::string, int> local_count_map;
+  std::unordered_map<std::uint8_t, int> local_count_map;
 
-  for (const auto & object : objects) {
+  for (const auto & object : objects.objects) {
     const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
     local_count_map[label]++;
   }
