@@ -53,6 +53,11 @@ bool QPSolverCGMRES::solveCGMRES(
   cgmres::Vector<3> x;
   x << x0(0), x0(1), x0(2);
 
+  if (!is_initialized_) {
+    initialized_time_ = std::chrono::system_clock::now();
+    is_initialized_ = true;
+  }
+
   if (warm_start) {
     const double time_from_last_initialized =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -74,10 +79,6 @@ bool QPSolverCGMRES::solveCGMRES(
     const double t0 = 0.0;
     initializer_.solve(t0, x);
     u = initializer_.uopt();
-    if (!is_initialized_) {
-      initialized_time_ = std::chrono::system_clock::now();
-      is_initialized_ = true;
-    }
     mpc_.set_uc(initializer_.ucopt());
     mpc_.init_dummy_mu();
     RCLCPP_DEBUG(logger_, "\n\n\n u = %e \n\n\n", u(0));
