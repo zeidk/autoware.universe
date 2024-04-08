@@ -84,7 +84,7 @@ class MetricsCalculator
 {
 public:
   explicit MetricsCalculator(const std::shared_ptr<Parameters> & parameters)
-  : parameters_(parameters);
+  : parameters_(parameters){};
 
   /**
    * @brief calculate
@@ -98,6 +98,8 @@ public:
    * @param [in] objects predicted objects
    */
   void setPredictedObjects(const PredictedObjects & objects);
+
+  void updateObjectsCountMap(const PredictedObjects & objects);
 
   HistoryPathMap getHistoryPathMap() const { return history_path_map_; }
   ObjectDataMap getDebugObjectData() const { return debug_target_object_; }
@@ -144,7 +146,7 @@ private:
   Stat<double> calcPredictedPathDeviationMetrics(
     const PredictedObjects & objects, const double time_horizon) const;
   MetricStatMap calcYawRateMetrics(const ClassObjectsMap & class_objects_map) const;
-  MetricStatMap calcObjectsCountMetrics(const PredictedObjects & objects) const;
+  MetricStatMap calcObjectsCountMetrics() const;
 
   bool hasPassedTime(const rclcpp::Time stamp) const;
   bool hasPassedTime(const std::string uuid, const rclcpp::Time stamp) const;

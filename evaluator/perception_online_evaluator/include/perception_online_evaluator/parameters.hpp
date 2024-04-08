@@ -51,7 +51,7 @@ struct Parameters
   double stopped_velocity_threshold{0.0};
   double detection_range;
   double detection_height;
-  double object_count_window_size;
+  double objects_count_window_size;
   DebugMarkerParameter debug_marker_parameters;
   // parameters depend on object class
   std::unordered_map<uint8_t, ObjectParameter> object_parameters;

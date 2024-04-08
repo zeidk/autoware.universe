@@ -112,6 +112,7 @@ DiagnosticStatus PerceptionOnlineEvaluatorNode::generateDiagnosticStatus(
 void PerceptionOnlineEvaluatorNode::onObjects(const PredictedObjects::ConstSharedPtr objects_msg)
 {
   metrics_calculator_.setPredictedObjects(*objects_msg);
+  metrics_calculator_.updateObjectsCountMap(*objects_msg);
   publishMetrics();
 }
 
@@ -217,7 +218,7 @@ rcl_interfaces::msg::SetParametersResult PerceptionOnlineEvaluatorNode::onParame
   updateParam<double>(parameters, "stopped_velocity_threshold", p->stopped_velocity_threshold);
   updateParam<double>(parameters, "detection_range", p->detection_range);
   updateParam<double>(parameters, "detection_height", p->detection_height);
-  updateParam<double>(parameters, "object_count_window_size", p->object_count_window_size);
+  updateParam<double>(parameters, "objects_count_window_size", p->objects_count_window_size);
 
   // update metrics
   {
@@ -312,8 +313,8 @@ void PerceptionOnlineEvaluatorNode::initParameter()
     getOrDeclareParameter<double>(*this, "stopped_velocity_threshold");
   p->detection_range = getOrDeclareParameter<double>(*this, "detection_range");
   p->detection_height = getOrDeclareParameter<double>(*this, "detection_height");
-  p->object_count_window_size =
-    getOrDeclareParameter<double>(*this, "object_count_window_size");
+  p->objects_count_window_size =
+    getOrDeclareParameter<double>(*this, "objects_count_window_size");
 
   // set metrics
   const auto selected_metrics =

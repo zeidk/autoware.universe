@@ -59,8 +59,8 @@ std::optional<MetricStatMap> MetricsCalculator::calculate(const Metric & metric)
       return calcPredictedPathDeviationMetrics(class_moving_objects_map);
     case Metric::yaw_rate:
       return calcYawRateMetrics(class_stopped_objects_map);
-    // case Metric::objects_count:
-    //   return calcObjectsCountMetrics(target_stamp_objects);
+    case Metric::objects_count:
+      return calcObjectsCountMetrics();
     default:
       return {};
   }
@@ -402,18 +402,13 @@ MetricStatMap MetricsCalculator::calcYawRateMetrics(const ClassObjectsMap & clas
   return metric_stat_map;
 }
 
-MetricStatMap MetricsCalculator::calcObjectsCountMetrics(const PredictedObjects & objects) const
+MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 {
   MetricStatMap metric_stat_map{};
 
-  for (const auto & object : objects.objects) {
-    const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
-    detection_count_map_[label]++;
-  }
-
   for (const auto & [label, count] : detection_count_map_) {
     Stat<double> stat;
-    std::cerr << "label = " << label << std::endl;
+    std::cerr << "label = " << convertLabelToString(label) << std::endl;
     std::cerr << "count = " << count << std::endl;
     stat.add(static_cast<double>(count));
     metric_stat_map["objects_count_" + convertLabelToString(label)] = stat;
@@ -437,6 +432,14 @@ void MetricsCalculator::setPredictedObjects(const PredictedObjects & objects)
     }
     deleteOldObjects(current_stamp_);
     updateHistoryPath();
+  }
+}
+
+void MetricsCalculator::updateObjectsCountMap(const PredictedObjects & objects)
+{
+  for (const auto & object : objects.objects) {
+    const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
+    detection_count_map_[label]++;
   }
 }
 
