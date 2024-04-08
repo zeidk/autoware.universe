@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <map>
 #include <optional>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -75,6 +76,7 @@ using HistoryPathMap =
 using StampObjectMap = std::map<rclcpp::Time, PredictedObject>;
 using StampObjectMapIterator = std::map<rclcpp::Time, PredictedObject>::const_iterator;
 using ObjectMap = std::unordered_map<std::string, StampObjectMap>;
+using DetectionCountMap = std::unordered_map<std::uint8_t, int>;
 
 class MetricsCalculator
 {
@@ -97,6 +99,7 @@ public:
 
   HistoryPathMap getHistoryPathMap() const { return history_path_map_; }
   ObjectDataMap getDebugObjectData() const { return debug_target_object_; }
+  DetectionCountMap getDetectionCountMap() const { return detection_count_map_; }
 
 private:
   std::shared_ptr<Parameters> parameters_;
@@ -104,7 +107,7 @@ private:
   // Store predicted objects information and calculation results
   ObjectMap object_map_;
   HistoryPathMap history_path_map_;
-  std::unordered_map<std::uint8_t, int> detection_count_map_;
+  DetectionCountMap detection_count_map_;
 
   rclcpp::Time current_stamp_;
 
