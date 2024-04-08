@@ -103,7 +103,7 @@ public:
 
   HistoryPathMap getHistoryPathMap() const { return history_path_map_; }
   ObjectDataMap getDebugObjectData() const { return debug_target_object_; }
-  DetectionCountMap getDetectionCountMap() const { return detection_count_map_; }
+  DetectionCountMap getDetectionCountMap() const { return historical_detection_count_map_; }
 
 private:
   std::shared_ptr<Parameters> parameters_;
@@ -111,16 +111,22 @@ private:
   // Store predicted objects information and calculation results
   ObjectMap object_map_;
   HistoryPathMap history_path_map_;
-  DetectionCountMap detection_count_map_ = {
-    {0, 0},  // UNKNOWN
-    {1, 0},  // CAR
-    {2, 0},  // TRUCK
-    {3, 0},  // BUS
-    {4, 0},  // TRAILER
-    {5, 0},  // MOTORCYCLE
-    {6, 0},  // BICYCLE
-    {7, 0},  // PEDESTRIAN
-  };
+  DetectionCountMap initializeDetectionCountMap()
+  {
+    return {
+      {0, 0},  // UNKNOWN
+      {1, 0},  // CAR
+      {2, 0},  // TRUCK
+      {3, 0},  // BUS
+      {4, 0},  // TRAILER
+      {5, 0},  // MOTORCYCLE
+      {6, 0},  // BICYCLE
+      {7, 0},  // PEDESTRIAN
+    };
+  }
+
+  DetectionCountMap historical_detection_count_map_ = initializeDetectionCountMap();
+  DetectionCountMap interval_detection_count_map_ = initializeDetectionCountMap();
 
   rclcpp::Time current_stamp_;
 

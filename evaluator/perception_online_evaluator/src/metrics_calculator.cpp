@@ -406,7 +406,7 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 {
   MetricStatMap metric_stat_map{};
 
-  for (const auto & [label, count] : detection_count_map_) {
+  for (const auto & [label, count] : historical_detection_count_map_) {
     Stat<double> stat;
     std::cerr << "label = " << convertLabelToString(label) << std::endl;
     std::cerr << "count = " << count << std::endl;
@@ -439,7 +439,7 @@ void MetricsCalculator::updateObjectsCountMap(const PredictedObjects & objects)
 {
   for (const auto & object : objects.objects) {
     const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
-    detection_count_map_[label]++;
+    historical_detection_count_map_[label]++;
   }
 }
 
