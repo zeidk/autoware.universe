@@ -59,8 +59,8 @@ std::optional<MetricStatMap> MetricsCalculator::calculate(const Metric & metric)
       return calcPredictedPathDeviationMetrics(class_moving_objects_map);
     case Metric::yaw_rate:
       return calcYawRateMetrics(class_stopped_objects_map);
-    case Metric::objects_count:
-      return calcObjectsCountMetrics(target_stamp_objects);
+    // case Metric::objects_count:
+    //   return calcObjectsCountMetrics(target_stamp_objects);
     default:
       return {};
   }
@@ -414,6 +414,8 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics(const PredictedObjects 
 
   for (const auto & [label, count] : local_count_map) {
     Stat<double> stat;
+    std::cerr << "label = " << label << std::endl;
+    std::cerr << "count = " << count << std::endl;
     stat.add(static_cast<double>(count));
     metric_stat_map["objects_count_" + convertLabelToString(label)] = stat;
   }
