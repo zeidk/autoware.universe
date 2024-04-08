@@ -29,7 +29,9 @@
 
 #include <algorithm>
 #include <map>
+#include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -82,7 +84,7 @@ class MetricsCalculator
 {
 public:
   explicit MetricsCalculator(const std::shared_ptr<Parameters> & parameters)
-  : parameters_(parameters){};
+  : parameters_(parameters);
 
   /**
    * @brief calculate
@@ -107,7 +109,16 @@ private:
   // Store predicted objects information and calculation results
   ObjectMap object_map_;
   HistoryPathMap history_path_map_;
-  DetectionCountMap detection_count_map_;
+  DetectionCountMap detection_count_map_ = {
+    {0, 0},  // UNKNOWN
+    {1, 0},  // CAR
+    {2, 0},  // TRUCK
+    {3, 0},  // BUS
+    {4, 0},  // TRAILER
+    {5, 0},  // MOTORCYCLE
+    {6, 0},  // BICYCLE
+    {7, 0},  // PEDESTRIAN
+  };
 
   rclcpp::Time current_stamp_;
 
