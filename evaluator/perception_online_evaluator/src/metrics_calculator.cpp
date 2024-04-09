@@ -408,10 +408,15 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 
   for (const auto & [label, count] : historical_detection_count_map_) {
     Stat<double> stat;
-    std::cerr << "label = " << convertLabelToString(label) << std::endl;
-    std::cerr << "count = " << count << std::endl;
+    // std::cerr << "label = " << convertLabelToString(label) << std::endl;
+    // std::cerr << "count = " << count << std::endl;
     stat.add(static_cast<double>(count));
-    metric_stat_map["objects_count_" + convertLabelToString(label)] = stat;
+    metric_stat_map["historical_objects_count_" + convertLabelToString(label)] = stat;
+  }
+  for (const auto & [label, count] : current_detection_count_map_) {
+    Stat<double> stat;
+    stat.add(static_cast<double>(count));
+    metric_stat_map["current_objects_count_" + convertLabelToString(label)] = stat;
   }
 
   return metric_stat_map;
@@ -439,7 +444,7 @@ void MetricsCalculator::updateObjectsCountMap(
   const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer)
 {
   const auto objects_frame_id = objects.header.frame_id;
-  std::cerr << "[perception_online_evaluator] Frame ID: " << objects_frame_id << std::endl;
+  // std::cerr << "[perception_online_evaluator] Frame ID: " << objects_frame_id << std::endl;
 
   geometry_msgs::msg::TransformStamped transform_stamped;
   try {
@@ -450,11 +455,15 @@ void MetricsCalculator::updateObjectsCountMap(
               << "' to 'base_link': " << ex.what() << std::endl;
     return;
   }
+  // initialize the current_detection_count_map_ with 0
+  for (const auto & [label, count] : current_detection_count_map_) {
+    current_detection_count_map_[label] = 0;
+  }
 
   for (const auto & object : objects.objects) {
     const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
-    std::cerr << "[perception_online_evaluator] Label: " << convertLabelToString(label)
-              << std::endl;
+    // std::cerr << "[perception_online_evaluator] Label: " << convertLabelToString(label)
+    //           << std::endl;
 
     geometry_msgs::msg::PoseStamped pose_in, pose_out;
     pose_in.header.frame_id = objects_frame_id;
@@ -465,18 +474,20 @@ void MetricsCalculator::updateObjectsCountMap(
 
     const double distance_to_pose = std::hypot(pose_out.pose.position.x, pose_out.pose.position.y);
 
-    // If the pose is within the detection_range and below a cdetection_height, increment the count
+    // If the pose is within the detection_range and below a detection_height, increment the count
     if (
       distance_to_pose < parameters_->detection_range &&
       pose_out.pose.position.z < parameters_->detection_height) {
       historical_detection_count_map_[label]++;
+      current_detection_count_map_[label]++;
     }
 
     // Output the object's position in the 'base_link' coordinate frame
-    std::cerr << "[perception_online_evaluator] Object in 'base_link': x="
-              << pose_out.pose.position.x << ", y=" << pose_out.pose.position.y
-              << ", z=" << pose_out.pose.position.z << std::endl;
-    std::cerr << "[perception_online_evaluator] distance_to_pose=" << distance_to_pose << std::endl;
+    // std::cerr << "[perception_online_evaluator] Object in 'base_link': x="
+    //           << pose_out.pose.position.x << ", y=" << pose_out.pose.position.y
+    //           << ", z=" << pose_out.pose.position.z << std::endl;
+    // std::cerr << "[perception_online_evaluator] distance_to_pose=" << distance_to_pose <<
+    // std::endl;
   }
 }
 
