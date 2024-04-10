@@ -408,7 +408,8 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 
   for (const auto & [label, count] : historical_detection_count_map_) {
     Stat<double> stat;
-    stat.add(static_cast<double>(count / objects_count_frame_));
+    stat.add(
+      static_cast<double>(static_cast<double>(count) / static_cast<double>(objects_count_frame_)));
     metric_stat_map["historical_objects_count_" + convertLabelToString(label)] = stat;
   }
 
