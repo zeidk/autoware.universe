@@ -408,17 +408,14 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 
   for (const auto & [label, count] : historical_detection_count_map_) {
     Stat<double> stat;
-    // std::cerr << "label = " << convertLabelToString(label) << std::endl;
-    // std::cerr << "count = " << count << std::endl;
-    stat.add(static_cast<double>(count));
+    stat.add(static_cast<double>(count / objects_count_frame_));
     metric_stat_map["historical_objects_count_" + convertLabelToString(label)] = stat;
   }
 
-  // count the number of objects in the detection_count_array_
-  int vector_count = detection_count_array_.size();
+  int vector_size = detection_count_vector_.size();
   DetectionCountMap interval_detection_count_map = initializeDetectionCountMap();
 
-  for (const auto & [detection_count_map, stamp] : detection_count_array_) {
+  for (const auto & [detection_count_map, stamp] : detection_count_vector_) {
     for (const auto & [label, count] : detection_count_map) {
       interval_detection_count_map[label] += count;
     }
@@ -426,7 +423,7 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 
   for (const auto & [label, count] : interval_detection_count_map) {
     Stat<double> stat;
-    stat.add(static_cast<double>(count) / static_cast<double>(vector_count));
+    stat.add(static_cast<double>(count) / static_cast<double>(vector_size));
     metric_stat_map["interval_objects_count_" + convertLabelToString(label)] = stat;
   }
 
@@ -455,6 +452,7 @@ void MetricsCalculator::updateObjectsCountMap(
   const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer)
 {
   const auto objects_frame_id = objects.header.frame_id;
+  objects_count_frame_++;
   DetectionCountMap current_detection_count_map = initializeDetectionCountMap();
 
   geometry_msgs::msg::TransformStamped transform_stamped;
@@ -469,8 +467,6 @@ void MetricsCalculator::updateObjectsCountMap(
 
   for (const auto & object : objects.objects) {
     const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
-    // std::cerr << "[perception_online_evaluator] Label: " << convertLabelToString(label)
-    //           << std::endl;
 
     geometry_msgs::msg::PoseStamped pose_in, pose_out;
     pose_in.header.frame_id = objects_frame_id;
@@ -479,28 +475,27 @@ void MetricsCalculator::updateObjectsCountMap(
     // Transform the object's pose into the 'base_link' coordinate frame
     tf2::doTransform(pose_in, pose_out, transform_stamped);
 
-    const double distance_to_pose = std::hypot(pose_out.pose.position.x, pose_out.pose.position.y);
+    const double distance_to_base_link =
+      std::hypot(pose_out.pose.position.x, pose_out.pose.position.y);
 
-    // If the pose is within the detection_range and below a detection_height, increment the count
-    const bool is_within_detection_range = distance_to_pose < parameters_->detection_range;
+    // If the pose is within the detection_radius and below a detection_height, increment the count
+    const bool is_within_detection_radius = distance_to_base_link < parameters_->detection_radius;
     const bool is_below_detection_height = pose_out.pose.position.z < parameters_->detection_height;
-    if (is_within_detection_range && is_below_detection_height) {
+    if (is_within_detection_radius && is_below_detection_height) {
       historical_detection_count_map_[label]++;
       current_detection_count_map[label]++;
     }
   }
 
-  detection_count_array_.emplace_back(current_detection_count_map, current_stamp_);
-  std::cerr << "time_delay = " << (current_stamp_ - detection_count_array_.front().second).seconds()
-            << " seconds" << std::endl;
+  detection_count_vector_.emplace_back(current_detection_count_map, current_stamp_);
 
   auto remove_before =
     current_stamp_ - rclcpp::Duration::from_seconds(parameters_->objects_count_window_seconds);
-  detection_count_array_.erase(
+  detection_count_vector_.erase(
     std::remove_if(
-      detection_count_array_.begin(), detection_count_array_.end(),
+      detection_count_vector_.begin(), detection_count_vector_.end(),
       [&](const auto & pair) { return pair.second < remove_before; }),
-    detection_count_array_.end());
+    detection_count_vector_.end());
 }
 
 void MetricsCalculator::deleteOldObjects(const rclcpp::Time stamp)

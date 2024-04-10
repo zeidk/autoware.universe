@@ -124,7 +124,8 @@ private:
   }
 
   DetectionCountMap historical_detection_count_map_ = initializeDetectionCountMap();
-  std::vector<std::pair<DetectionCountMap, rclcpp::Time>> detection_count_array_;
+  int objects_count_frame_ = 0;
+  std::vector<std::pair<DetectionCountMap, rclcpp::Time>> detection_count_vector_{};
 
   rclcpp::Time current_stamp_;
 
