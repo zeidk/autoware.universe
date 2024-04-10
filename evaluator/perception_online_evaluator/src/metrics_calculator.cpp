@@ -404,7 +404,7 @@ MetricStatMap MetricsCalculator::calcYawRateMetrics(const ClassObjectsMap & clas
 
 MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
 {
-  MetricStatMap metric_stat_map{};
+  MetricStatMap metric_stat_map;
 
   for (const auto & [label, count] : historical_detection_count_map_) {
     Stat<double> stat;
@@ -413,10 +413,21 @@ MetricStatMap MetricsCalculator::calcObjectsCountMetrics() const
     stat.add(static_cast<double>(count));
     metric_stat_map["historical_objects_count_" + convertLabelToString(label)] = stat;
   }
-  for (const auto & [label, count] : current_detection_count_map_) {
+
+  // count the number of objects in the detection_count_array_
+  int vector_count = detection_count_array_.size();
+  DetectionCountMap interval_detection_count_map = initializeDetectionCountMap();
+
+  for (const auto & [detection_count_map, stamp] : detection_count_array_) {
+    for (const auto & [label, count] : detection_count_map) {
+      interval_detection_count_map[label] += count;
+    }
+  }
+
+  for (const auto & [label, count] : interval_detection_count_map) {
     Stat<double> stat;
-    stat.add(static_cast<double>(count));
-    metric_stat_map["current_objects_count_" + convertLabelToString(label)] = stat;
+    stat.add(static_cast<double>(count) / static_cast<double>(vector_count));
+    metric_stat_map["interval_objects_count_" + convertLabelToString(label)] = stat;
   }
 
   return metric_stat_map;
@@ -444,6 +455,8 @@ void MetricsCalculator::updateObjectsCountMap(
   const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer)
 {
   const auto objects_frame_id = objects.header.frame_id;
+  DetectionCountMap current_detection_count_map = initializeDetectionCountMap();
+
   // std::cerr << "[perception_online_evaluator] Frame ID: " << objects_frame_id << std::endl;
 
   geometry_msgs::msg::TransformStamped transform_stamped;
@@ -454,10 +467,6 @@ void MetricsCalculator::updateObjectsCountMap(
     std::cerr << "[perception_online_evaluator] Failed to get transform from '" << objects_frame_id
               << "' to 'base_link': " << ex.what() << std::endl;
     return;
-  }
-  // initialize the current_detection_count_map_ with 0
-  for (const auto & [label, count] : current_detection_count_map_) {
-    current_detection_count_map_[label] = 0;
   }
 
   for (const auto & object : objects.objects) {
@@ -479,7 +488,7 @@ void MetricsCalculator::updateObjectsCountMap(
       distance_to_pose < parameters_->detection_range &&
       pose_out.pose.position.z < parameters_->detection_height) {
       historical_detection_count_map_[label]++;
-      current_detection_count_map_[label]++;
+      current_detection_count_map[label]++;
     }
 
     // Output the object's position in the 'base_link' coordinate frame
@@ -488,6 +497,17 @@ void MetricsCalculator::updateObjectsCountMap(
     //           << ", z=" << pose_out.pose.position.z << std::endl;
     // std::cerr << "[perception_online_evaluator] distance_to_pose=" << distance_to_pose <<
     // std::endl;
+  }
+
+  detection_count_array_.emplace_back(current_detection_count_map, current_stamp_);
+  std::cerr << "time_delay = " << (current_stamp_ - detection_count_array_.front().second).seconds()
+            << " seconds" << std::endl;
+
+  while (!detection_count_array_.empty() &&
+         detection_count_array_.front().second <
+           current_stamp_ -
+             rclcpp::Duration::from_seconds(parameters_->objects_count_window_seconds)) {
+    detection_count_array_.erase(detection_count_array_.begin());
   }
 }
 
