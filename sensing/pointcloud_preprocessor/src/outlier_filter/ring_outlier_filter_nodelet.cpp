@@ -61,7 +61,6 @@ RingOutlierFilterComponent::RingOutlierFilterComponent(const rclcpp::NodeOptions
     vertical_bins_ = static_cast<int>(declare_parameter("vertical_bins", 128));
     horizontal_bins_ = static_cast<int>(declare_parameter("horizontal_bins", 36));
     noise_threshold_ = static_cast<int>(declare_parameter("noise_threshold", 2));
-
   }
 
   using std::placeholders::_1;
@@ -271,7 +270,6 @@ void RingOutlierFilterComponent::faster_filter(
     const auto frequency_image = createBinaryImage(outlier);
     const double num_filled_pixels =
       calculateFilledPixels(frequency_image, vertical_bins_, horizontal_bins_);
-    std::cerr << "\n\n\n visibility_score: " << 1.0f - num_filled_pixels << std::endl;
     auto frequency_image_msg = toFrequencyImageMsg(frequency_image);
 
     frequency_image_msg.header = input->header;
