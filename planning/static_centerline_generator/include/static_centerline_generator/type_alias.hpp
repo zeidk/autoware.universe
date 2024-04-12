@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#ifndef STATIC_CENTERLINE_OPTIMIZER__TYPE_ALIAS_HPP_
-#define STATIC_CENTERLINE_OPTIMIZER__TYPE_ALIAS_HPP_
+#ifndef STATIC_CENTERLINE_GENERATOR__TYPE_ALIAS_HPP_
+#define STATIC_CENTERLINE_GENERATOR__TYPE_ALIAS_HPP_
 
 #include "route_handler/route_handler.hpp"
 #include "tier4_autoware_utils/geometry/geometry.hpp"
@@ -26,7 +26,7 @@
 #include "autoware_planning_msgs/msg/lanelet_route.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
 
-namespace static_centerline_optimizer
+namespace static_centerline_generator
 {
 using autoware_auto_mapping_msgs::msg::HADMapBin;
 using autoware_auto_perception_msgs::msg::PredictedObjects;
@@ -41,6 +41,6 @@ using tier4_autoware_utils::LinearRing2d;
 using tier4_autoware_utils::LineString2d;
 using tier4_autoware_utils::Point2d;
 using visualization_msgs::msg::MarkerArray;
-}  // namespace static_centerline_optimizer
+}  // namespace static_centerline_generator
 
-#endif  // STATIC_CENTERLINE_OPTIMIZER__TYPE_ALIAS_HPP_
+#endif  // STATIC_CENTERLINE_GENERATOR__TYPE_ALIAS_HPP_

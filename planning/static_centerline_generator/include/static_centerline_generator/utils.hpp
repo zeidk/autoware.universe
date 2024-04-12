@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef STATIC_CENTERLINE_OPTIMIZER__UTILS_HPP_
-#define STATIC_CENTERLINE_OPTIMIZER__UTILS_HPP_
+#ifndef STATIC_CENTERLINE_GENERATOR__UTILS_HPP_
+#define STATIC_CENTERLINE_GENERATOR__UTILS_HPP_
 
 #include "route_handler/route_handler.hpp"
-#include "static_centerline_optimizer/type_alias.hpp"
+#include "static_centerline_generator/type_alias.hpp"
 
 #include <rclcpp/time.hpp>
 
@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 
-namespace static_centerline_optimizer
+namespace static_centerline_generator
 {
 namespace utils
 {
@@ -53,6 +53,6 @@ MarkerArray create_distance_text_marker(
   const geometry_msgs::msg::Pose & pose, const double dist,
   const std::array<double, 3> & marker_color, const rclcpp::Time & now, const size_t idx);
 }  // namespace utils
-}  // namespace static_centerline_optimizer
+}  // namespace static_centerline_generator
 
-#endif  // STATIC_CENTERLINE_OPTIMIZER__UTILS_HPP_
+#endif  // STATIC_CENTERLINE_GENERATOR__UTILS_HPP_

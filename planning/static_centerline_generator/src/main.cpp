@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "static_centerline_optimizer/static_centerline_optimizer_node.hpp"
+#include "static_centerline_generator/static_centerline_generator_node.hpp"
 
 int main(int argc, char * argv[])
 {
@@ -21,7 +21,7 @@ int main(int argc, char * argv[])
   // initialize node
   rclcpp::NodeOptions node_options;
   auto node =
-    std::make_shared<static_centerline_optimizer::StaticCenterlineOptimizerNode>(node_options);
+    std::make_shared<static_centerline_generator::StaticCenterlineGeneratorNode>(node_options);
 
   // get ros parameter
   const bool run_background = node->declare_parameter<bool>("run_background");

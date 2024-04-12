@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef STATIC_CENTERLINE_OPTIMIZER__STATIC_CENTERLINE_OPTIMIZER_NODE_HPP_
-#define STATIC_CENTERLINE_OPTIMIZER__STATIC_CENTERLINE_OPTIMIZER_NODE_HPP_
+#ifndef STATIC_CENTERLINE_GENERATOR__STATIC_CENTERLINE_GENERATOR_NODE_HPP_
+#define STATIC_CENTERLINE_GENERATOR__STATIC_CENTERLINE_GENERATOR_NODE_HPP_
 
 #include "rclcpp/rclcpp.hpp"
-#include "static_centerline_optimizer/centerline_source/optimization_trajectory_based_centerline.hpp"
-#include "static_centerline_optimizer/srv/load_map.hpp"
-#include "static_centerline_optimizer/srv/plan_path.hpp"
-#include "static_centerline_optimizer/srv/plan_route.hpp"
-#include "static_centerline_optimizer/type_alias.hpp"
+#include "static_centerline_generator/centerline_source/optimization_trajectory_based_centerline.hpp"
+#include "static_centerline_generator/srv/load_map.hpp"
+#include "static_centerline_generator/srv/plan_path.hpp"
+#include "static_centerline_generator/srv/plan_route.hpp"
+#include "static_centerline_generator/type_alias.hpp"
 #include "vehicle_info_util/vehicle_info_util.hpp"
 
 #include <geography_utils/lanelet2_projector.hpp>
@@ -34,11 +34,11 @@
 #include <utility>
 #include <vector>
 
-namespace static_centerline_optimizer
+namespace static_centerline_generator
 {
-using static_centerline_optimizer::srv::LoadMap;
-using static_centerline_optimizer::srv::PlanPath;
-using static_centerline_optimizer::srv::PlanRoute;
+using static_centerline_generator::srv::LoadMap;
+using static_centerline_generator::srv::PlanPath;
+using static_centerline_generator::srv::PlanRoute;
 
 struct CenterlineWithRoute
 {
@@ -46,10 +46,10 @@ struct CenterlineWithRoute
   std::vector<lanelet::Id> route_lane_ids{};
 };
 
-class StaticCenterlineOptimizerNode : public rclcpp::Node
+class StaticCenterlineGeneratorNode : public rclcpp::Node
 {
 public:
-  explicit StaticCenterlineOptimizerNode(const rclcpp::NodeOptions & node_options);
+  explicit StaticCenterlineGeneratorNode(const rclcpp::NodeOptions & node_options);
   void run();
 
 private:
@@ -115,5 +115,5 @@ private:
   // vehicle info
   vehicle_info_util::VehicleInfo vehicle_info_;
 };
-}  // namespace static_centerline_optimizer
-#endif  // STATIC_CENTERLINE_OPTIMIZER__STATIC_CENTERLINE_OPTIMIZER_NODE_HPP_
+}  // namespace static_centerline_generator
+#endif  // STATIC_CENTERLINE_GENERATOR__STATIC_CENTERLINE_GENERATOR_NODE_HPP_
