@@ -37,6 +37,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 
+#include <fstream>
 #include <memory>
 #include <vector>
 
@@ -70,6 +71,7 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
   node_options.arguments(
     {"--ros-args", "--params-file",
      lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
+     //  lateral_share_dir + "/param/lateral_controller_defaults.param.yaml", "--params-file",
      longitudinal_share_dir + "/param/longitudinal_controller_defaults.param.yaml", "--params-file",
      share_dir + "/test/test_vehicle_info.param.yaml", "--params-file",
      share_dir + "/test/test_nearest_search.param.yaml", "--params-file",
@@ -151,6 +153,8 @@ public:
 
   Trajectory::SharedPtr resampled_reference_trajectory;
   bool received_resampled_reference_trajectory = false;
+  Trajectory::SharedPtr predicted_trajectory_in_frenet_coordinate;
+  bool received_predicted_trajectory_in_frenet_coordinate = false;
 
   void publish_default_odom()
   {
@@ -243,12 +247,21 @@ public:
         received_control_command = true;
       });
 
-  rclcpp::Subscription<Trajectory>::SharedPtr traj_sub = fnf->create_subscription<Trajectory>(
-    "controller/debug/resampled_reference_trajectory", *fnf->get_fake_node(),
-    [this](const Trajectory::SharedPtr msg) {
-      resampled_reference_trajectory = msg;
-      received_resampled_reference_trajectory = true;
-    });
+  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_sub =
+    fnf->create_subscription<Trajectory>(
+      "controller/debug/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        predicted_trajectory_in_frenet_coordinate = msg;
+        received_predicted_trajectory_in_frenet_coordinate = true;
+      });
+
+  rclcpp::Subscription<Trajectory>::SharedPtr resampled_ref_traj_sub =
+    fnf->create_subscription<Trajectory>(
+      "controller/debug/resampled_reference_trajectory", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        resampled_reference_trajectory = msg;
+        received_resampled_reference_trajectory = true;
+      });
 
   std::shared_ptr<tf2_ros::StaticTransformBroadcaster> br =
     std::make_shared<tf2_ros::StaticTransformBroadcaster>(fnf->get_fake_node());
@@ -354,6 +367,31 @@ TEST_F(FakeNodeFixture, right_turn)
   // save_message_to_rosbag(
   //   save_directory, tester.resampled_reference_trajectory,
   //   "controller/debug/resampled_reference_trajectory");
+  std::ofstream outputFile("output.csv");
+  outputFile << "reference trajectory,,,predicted trajectory" << std::endl;
+  outputFile << "x,y,,x,y" << std::endl;
+
+  auto ref_it = tester.resampled_reference_trajectory->points.begin();
+  auto pred_it = tester.predicted_trajectory_in_frenet_coordinate->points.begin();
+
+  while (ref_it != tester.resampled_reference_trajectory->points.end() ||
+         pred_it != tester.predicted_trajectory_in_frenet_coordinate->points.end()) {
+    if (ref_it != tester.resampled_reference_trajectory->points.end()) {
+      outputFile << ref_it->pose.position.x << "," << ref_it->pose.position.y << ",,";
+      ++ref_it;
+    } else {
+      outputFile << ",,,";
+    }
+
+    if (pred_it != tester.predicted_trajectory_in_frenet_coordinate->points.end()) {
+      outputFile << pred_it->pose.position.x << "," << pred_it->pose.position.y << std::endl;
+      ++pred_it;
+    } else {
+      outputFile << std::endl;
+    }
+  }
+
+  outputFile.close();
 
   std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
   std::cerr << "lat steer tire rotation rate: "
