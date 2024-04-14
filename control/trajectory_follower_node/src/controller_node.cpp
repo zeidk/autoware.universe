@@ -192,7 +192,6 @@ boost::optional<trajectory_follower::InputData> Controller::createInputData(
 
 void Controller::callbackTimerControl()
 {
-  // std::cerr << "*************** callbackTimerControl() is called *********************" << std::endl;
   // 1. create input data
   const auto input_data = createInputData(*get_clock());
   if (!input_data) {
@@ -204,8 +203,6 @@ void Controller::callbackTimerControl()
   // 2. check if controllers are ready
   const bool is_lat_ready = lateral_controller_->isReady(*input_data);
   const bool is_lon_ready = longitudinal_controller_->isReady(*input_data);
-  // std::cerr << "is_lat_ready: " << is_lat_ready << std::endl;
-  // std::cerr << "is_lon_ready: " << is_lon_ready << std::endl;
   if (!is_lat_ready || !is_lon_ready) {
     RCLCPP_INFO_THROTTLE(
       get_logger(), *get_clock(), 5000,

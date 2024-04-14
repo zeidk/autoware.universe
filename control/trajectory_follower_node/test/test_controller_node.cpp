@@ -367,9 +367,9 @@ TEST_F(FakeNodeFixture, right_turn)
   // save_message_to_rosbag(
   //   save_directory, tester.resampled_reference_trajectory,
   //   "controller/debug/resampled_reference_trajectory");
-  std::ofstream outputFile("output.csv");
-  outputFile << "reference trajectory,,,predicted trajectory" << std::endl;
-  outputFile << "x,y,,x,y" << std::endl;
+  std::ofstream output_file("output.csv");
+  output_file << "reference trajectory,,,predicted trajectory" << std::endl;
+  output_file << "x,y,,x,y" << std::endl;
 
   auto ref_it = tester.resampled_reference_trajectory->points.begin();
   auto pred_it = tester.predicted_trajectory_in_frenet_coordinate->points.begin();
@@ -377,21 +377,21 @@ TEST_F(FakeNodeFixture, right_turn)
   while (ref_it != tester.resampled_reference_trajectory->points.end() ||
          pred_it != tester.predicted_trajectory_in_frenet_coordinate->points.end()) {
     if (ref_it != tester.resampled_reference_trajectory->points.end()) {
-      outputFile << ref_it->pose.position.x << "," << ref_it->pose.position.y << ",,";
+      output_file << ref_it->pose.position.x << "," << ref_it->pose.position.y << ",,";
       ++ref_it;
     } else {
-      outputFile << ",,,";
+      output_file << ",,,";
     }
 
     if (pred_it != tester.predicted_trajectory_in_frenet_coordinate->points.end()) {
-      outputFile << pred_it->pose.position.x << "," << pred_it->pose.position.y << std::endl;
+      output_file << pred_it->pose.position.x << "," << pred_it->pose.position.y << std::endl;
       ++pred_it;
     } else {
-      outputFile << std::endl;
+      output_file << std::endl;
     }
   }
 
-  outputFile.close();
+  output_file.close();
 
   std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
   std::cerr << "lat steer tire rotation rate: "

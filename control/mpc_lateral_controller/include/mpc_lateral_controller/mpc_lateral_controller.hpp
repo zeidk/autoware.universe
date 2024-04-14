@@ -61,9 +61,7 @@ private:
   rclcpp::Logger logger_;
 
   //!< @brief solver for the mpc problem
-  // std::string solver_name = "osqp";
   std::string qp_solver_type_;
-
 
   rclcpp::Publisher<Trajectory>::SharedPtr m_pub_predicted_traj;
   rclcpp::Publisher<Float32MultiArrayStamped>::SharedPtr m_pub_debug_values;

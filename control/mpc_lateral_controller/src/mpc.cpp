@@ -93,9 +93,6 @@ bool MPC::calculateMPC(
     std::tie(success_opt, Uex) = executeOptimization(
       x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
       current_kinematics.twist.twist.linear.x);
-    // std::cerr << "current kinematics position: \n x: " << current_kinematics.pose.pose.position.x
-    //           << " y: " << current_kinematics.pose.pose.position.y
-    //           << " at frame ID: " << current_kinematics.header.frame_id << std::endl;
 
   } else {
     // solve Optimization problem
