@@ -40,8 +40,8 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger)
 }
 
 bool QPSolverCGMRES::solveCGMRES(
-  const Eigen::VectorXd & x0, const double prediction_dt, Eigen::VectorXd & u,
-  const bool warm_start)
+  const Eigen::VectorXd & x0, const MPCTrajectory & resampled_ref_trajectory,
+  const double prediction_dt, Eigen::VectorXd & u, const bool warm_start)
 {
   std::cerr << "prediction_dt: " << prediction_dt << std::endl;
   // // Define the horizon.
@@ -52,6 +52,18 @@ bool QPSolverCGMRES::solveCGMRES(
   // state は 横偏差、ヨー角、ステアリング角度の3つ
   cgmres::Vector<3> x;
   x << x0(0), x0(1), x0(2);
+
+  // calculate the average curvature of the reference trajectory
+  double curvature_sum = 0.0;
+  for (size_t i = 0; i < resampled_ref_trajectory.k.size(); ++i) {
+    curvature_sum += resampled_ref_trajectory.k.at(i);
+  }
+  const double average_curvature = curvature_sum / resampled_ref_trajectory.k.size();
+  // set the external reference ptr
+  ocp_.curvature_in_reference_trajectory = average_curvature;
+  ocp_.u_ref[0] = std::atan(average_curvature * ocp_.wheel_base);
+  std::cerr << "average_curvature: " << average_curvature << std::endl;
+  std::cerr << "ocp_.u_ref[0]: " << ocp_.u_ref[0] << std::endl;
 
   if (!is_initialized_) {
     initialized_time_ = std::chrono::system_clock::now();

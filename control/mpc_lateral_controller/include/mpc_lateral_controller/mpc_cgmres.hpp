@@ -27,6 +27,7 @@
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <memory>
 
 namespace cgmres
 {
@@ -71,7 +72,7 @@ public:
   double v_in_reference_trajectory = 1.0;
   double curvature_in_reference_trajectory = -0.5;
   double smoothed_curvature_in_reference_trajectory = -0.5;
-  double wheel_base = 2.79;
+  double wheel_base = 2.79;  // arctan(wheel base * curvature_in_reference_trajectory)
   double tau_ = 0.3;
 
   std::array<double, 3> q = {1.0, 0.1, 0.0};
@@ -135,10 +136,37 @@ public:
   }
 
   ///
+  /// @class ExternalReference
+  /// @brief External reference of the lateral controller
+  ///
+  struct ExternalReference
+  {
+    ///
+    /// @brief Position of the cart. Default is 0.
+    ///
+    double curvature_in_reference_trajectory = 0.0;
+  };
+
+  ///
+  /// @brief Shared ptr to the external reference of the lateral controller.
+  ///
+  std::shared_ptr<ExternalReference> external_reference = nullptr;
+
+  ///
   /// @brief Synchrozies the internal parameters of this OCP with the external references.
   /// This method is called at the beginning of each MPC update.
   ///
-  void synchronize() {}
+  void synchronize()
+  {
+    // std::cerr << "\n\n\n synchronize is called \n\n\n" << std::endl;
+    if (external_reference != nullptr) {
+      u_ref[0] = std::atan(external_reference->curvature_in_reference_trajectory * wheel_base);
+      curvature_in_reference_trajectory = external_reference->curvature_in_reference_trajectory;
+      std::cerr << "u_ref is updated as: " << u_ref[0] << std::endl;
+      std::cerr << "curvature_in_reference_trajectory is updated as: "
+                << curvature_in_reference_trajectory << std::endl;
+    }
+  }
 
   ///
   /// @brief Computes the state equation dx = f(t, x, u).

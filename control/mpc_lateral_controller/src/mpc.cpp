@@ -84,10 +84,9 @@ bool MPC::calculateMPC(
   // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
   const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
 
-  for (Eigen::Index i = 0; i < x0_delayed.size(); ++i) {
-    RCLCPP_DEBUG(m_logger, "x0_delayed [%ld]: %f", i, x0_delayed(i));
-    // std::cerr << "x0_delayed [" << i << "]: " << x0_delayed(i) << std::endl;
-  }
+  // for (Eigen::Index i = 0; i < x0_delayed.size(); ++i) {
+  //   RCLCPP_DEBUG(m_logger, "x0_delayed [%ld]: %f", i, x0_delayed(i));
+  // }
 
   if (qp_solver_type == "cgmres") {
     std::tie(success_opt, Uex) = executeOptimization(
@@ -244,6 +243,15 @@ void MPC::setReferenceTrajectory(
   // calculate curvature
   MPCUtils::calcTrajectoryCurvature(
     param.curvature_smoothing_num_traj, param.curvature_smoothing_num_ref_steer, mpc_traj_smoothed);
+  // auto calculate_mean = [](const std::vector<double> & v) {
+  //   double sum = std::accumulate(v.begin(), v.end(), 0.0);
+  //   return sum / v.size();
+  // };
+  // RCLCPP_DEBUG(
+  //   m_logger, "mpc_traj_smoothed's average curvature: %f", calculate_mean(mpc_traj_smoothed.k));
+  // RCLCPP_DEBUG(
+  //   m_logger, "mpc_traj_smoothed's average smooth curvature: %f",
+  //   calculate_mean(mpc_traj_smoothed.smooth_k));
 
   // stop velocity at a terminal point
   mpc_traj_smoothed.vx.back() = 0.0;
@@ -661,7 +669,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
     RCLCPP_DEBUG(m_logger, "execute optimization without warm start (CGMRES)");
   }
 
-  solve_result = m_qpsolver_ptr->solveCGMRES(x0, DT, Uex, warm_start);
+  solve_result = m_qpsolver_ptr->solveCGMRES(x0, resampled_ref_trajectory, DT, Uex, warm_start);
   auto t_end = std::chrono::system_clock::now();
 
   if (!solve_result) {

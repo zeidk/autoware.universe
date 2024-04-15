@@ -15,6 +15,8 @@
 #ifndef MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_INTERFACE_HPP_
 #define MPC_LATERAL_CONTROLLER__QP_SOLVER__QP_SOLVER_INTERFACE_HPP_
 
+#include "mpc_lateral_controller/mpc_trajectory.hpp"
+
 #include <Eigen/Core>
 
 namespace autoware::motion::control::mpc_lateral_controller
@@ -59,8 +61,8 @@ public:
    * @return true if the problem was solved
    */
   virtual bool solveCGMRES(
-    const Eigen::VectorXd & /* x0 */, const double /*prediction_dt */, Eigen::VectorXd & /*u*/,
-    const bool /* warm_start */)
+    const Eigen::VectorXd & /* x0 */, const MPCTrajectory & /*resampled_ref_trajectory*/,
+    const double /*prediction_dt */, Eigen::VectorXd & /*u*/, const bool /* warm_start */)
   {
     return false;
   }
