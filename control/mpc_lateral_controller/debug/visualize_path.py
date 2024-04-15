@@ -13,15 +13,12 @@ def read_csv(directory, filename):
     return [float(x) for x in data[0] if x]
 
 
-# コマンドライン引数の解析
 parser = argparse.ArgumentParser(description="Plot trajectory data from CSV files.")
 parser.add_argument("directory", type=str, help="Directory containing the CSV files")
 args = parser.parse_args()
 
-# 指定されたディレクトリからファイルを読み込む
 data_directory = args.directory
 
-# CSVファイルからデータを読み込む
 original_x = read_csv(data_directory, "original_x.log")
 original_y = read_csv(data_directory, "original_y.log")
 resampled_x = read_csv(data_directory, "resampled_x.log")

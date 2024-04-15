@@ -24,6 +24,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include <cmath>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -124,6 +125,48 @@ inline void spinWhile(T & node)
     const auto dt{std::chrono::milliseconds{100LL}};
     std::this_thread::sleep_for(dt);
   }
+}
+
+void writeTrajectoriesToFiles(
+  const Trajectory & original_ref_trajectory, const Trajectory & resampled_ref_trajectory,
+  const Trajectory & predicted_trajectory, const rclcpp::Time & stamp)
+{
+  std::ofstream output_file_orig_x("original_x.log");
+  std::ofstream output_file_orig_y("original_y.log");
+  std::ofstream output_file_resampled_x("resampled_x.log");
+  std::ofstream output_file_resampled_y("resampled_y.log");
+  std::ofstream output_file_predicted_x("predicted_x.log");
+  std::ofstream output_file_predicted_y("predicted_y.log");
+  std::ofstream output_file_time("time.log");
+
+  auto original_ref_trajectory_it = original_ref_trajectory.points.begin();
+  while (original_ref_trajectory_it != original_ref_trajectory.points.end()) {
+    output_file_orig_x << original_ref_trajectory_it->pose.position.x << ",";
+    output_file_orig_y << original_ref_trajectory_it->pose.position.y << ",";
+    ++original_ref_trajectory_it;
+  }
+  output_file_orig_x << std::endl;
+  output_file_orig_y << std::endl;
+
+  auto ref_it = resampled_ref_trajectory.points.begin();
+  while (ref_it != resampled_ref_trajectory.points.end()) {
+    output_file_resampled_x << ref_it->pose.position.x << ",";
+    output_file_resampled_y << ref_it->pose.position.y << ",";
+    ++ref_it;
+  }
+  output_file_resampled_x << std::endl;
+  output_file_resampled_y << std::endl;
+
+  auto pred_it = predicted_trajectory.points.begin();
+  while (pred_it != predicted_trajectory.points.end()) {
+    output_file_predicted_x << pred_it->pose.position.x << ",";
+    output_file_predicted_y << pred_it->pose.position.y << ",";
+    ++pred_it;
+  }
+  output_file_predicted_x << std::endl;
+  output_file_predicted_y << std::endl;
+
+  output_file_time << stamp.seconds() << "." << stamp.nanoseconds() << std::endl;
 }
 }  // namespace test_utils
 

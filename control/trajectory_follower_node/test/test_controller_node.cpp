@@ -37,7 +37,6 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 
-#include <fstream>
 #include <memory>
 #include <vector>
 
@@ -343,50 +342,20 @@ TEST_F(FakeNodeFixture, right_turn)
   std_msgs::msg::Header header;
   header.stamp = tester.node->now();
   header.frame_id = "map";
-  traj_msg = test_utils::generateCurvatureTrajectory(header, -0.5, 4.0, 1.0);
+  traj_msg = test_utils::generateCurvatureTrajectory(header, -0.05, 4.0, 1.0);
   tester.traj_pub->publish(traj_msg);
 
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
   ASSERT_TRUE(tester.received_control_command);
+  test_utils::writeTrajectoriesToFiles(
+    traj_msg, *tester.resampled_reference_trajectory,
+    *tester.predicted_trajectory_in_frenet_coordinate, header.stamp);
   // ASSERT_TRUE(tester.received_resampled_reference_trajectory);
 
   // const auto save_directory = "/home/kyoichi-sugahara/workspace/log/reference_trajectory";
   // save_message_to_rosbag(
   //   save_directory, tester.resampled_reference_trajectory,
   //   "controller/debug/resampled_reference_trajectory");
-  std::ofstream output_file_orig_x("original_x.log");
-  std::ofstream output_file_orig_y("original_y.log");
-  std::ofstream output_file_resampled_x("resampled_x.log");
-  std::ofstream output_file_resampled_y("resampled_y.log");
-  std::ofstream output_file_predicted_x("predicted_x.log");
-  std::ofstream output_file_predicted_y("predicted_y.log");
-
-  auto traj_msg_it = traj_msg.points.begin();
-  while (traj_msg_it != traj_msg.points.end()) {
-    output_file_orig_x << traj_msg_it->pose.position.x << ",";
-    output_file_orig_y << traj_msg_it->pose.position.y << ",";
-    ++traj_msg_it;
-  }
-  output_file_orig_x << std::endl;
-  output_file_orig_y << std::endl;
-
-  auto ref_it = tester.resampled_reference_trajectory->points.begin();
-  while (ref_it != tester.resampled_reference_trajectory->points.end()) {
-    output_file_resampled_x << ref_it->pose.position.x << ",";
-    output_file_resampled_y << ref_it->pose.position.y << ",";
-    ++ref_it;
-  }
-  output_file_resampled_x << std::endl;
-  output_file_resampled_y << std::endl;
-
-  auto pred_it = tester.predicted_trajectory_in_frenet_coordinate->points.begin();
-  while (pred_it != tester.predicted_trajectory_in_frenet_coordinate->points.end()) {
-    output_file_predicted_x << pred_it->pose.position.x << ",";
-    output_file_predicted_y << pred_it->pose.position.y << ",";
-    ++pred_it;
-  }
-  output_file_predicted_x << std::endl;
-  output_file_predicted_y << std::endl;
 
   std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
   std::cerr << "lat steer tire rotation rate: "
