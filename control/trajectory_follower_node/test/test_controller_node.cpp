@@ -340,23 +340,10 @@ TEST_F(FakeNodeFixture, right_turn)
 
   // Right turning trajectory with a constant curvature of -0.5: expect right steering
   Trajectory traj_msg;
-  traj_msg.header.stamp = tester.node->now();
-  traj_msg.header.frame_id = "map";
-  traj_msg.points.push_back(test_utils::make_traj_point(-2.0, -2.0, 1.0f));
-  traj_msg.points.push_back(
-    test_utils::make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
-  traj_msg.points.push_back(
-    test_utils::make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
-  traj_msg.points.push_back(
-    test_utils::make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
-  traj_msg.points.push_back(test_utils::make_traj_point(0.0, 0.0, 1.0f));
-  traj_msg.points.push_back(
-    test_utils::make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
-  traj_msg.points.push_back(
-    test_utils::make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
-  traj_msg.points.push_back(
-    test_utils::make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
-  traj_msg.points.push_back(test_utils::make_traj_point(2.0, -2.0, 1.0f));
+  std_msgs::msg::Header header;
+  header.stamp = tester.node->now();
+  header.frame_id = "map";
+  traj_msg = test_utils::generateCurvatureTrajectory(header, -0.5, 4.0, 1.0);
   tester.traj_pub->publish(traj_msg);
 
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
@@ -368,14 +355,25 @@ TEST_F(FakeNodeFixture, right_turn)
   //   save_directory, tester.resampled_reference_trajectory,
   //   "controller/debug/resampled_reference_trajectory");
   std::ofstream output_file("output.csv");
-  output_file << "reference trajectory,,,predicted trajectory" << std::endl;
-  output_file << "x,y,,x,y" << std::endl;
+  output_file
+    << "original reference trajectory,,,resampled_reference trajectory,,,predicted trajectory"
+    << std::endl;
+  output_file << "x,y,,x,y,,x,y" << std::endl;
 
+  auto traj_msg_it = traj_msg.points.begin();
   auto ref_it = tester.resampled_reference_trajectory->points.begin();
   auto pred_it = tester.predicted_trajectory_in_frenet_coordinate->points.begin();
 
-  while (ref_it != tester.resampled_reference_trajectory->points.end() ||
+  while (traj_msg_it != traj_msg.points.end() ||
+         ref_it != tester.resampled_reference_trajectory->points.end() ||
          pred_it != tester.predicted_trajectory_in_frenet_coordinate->points.end()) {
+    if (traj_msg_it != traj_msg.points.end()) {
+      output_file << traj_msg_it->pose.position.x << "," << traj_msg_it->pose.position.y << ",,";
+      ++traj_msg_it;
+    } else {
+      output_file << ",,,";
+    }
+
     if (ref_it != tester.resampled_reference_trajectory->points.end()) {
       output_file << ref_it->pose.position.x << "," << ref_it->pose.position.y << ",,";
       ++ref_it;
@@ -419,7 +417,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     std_msgs::msg::Header header;
     header.stamp = tester.node->now();
     header.frame_id = "map";
-    traj_msg = test_utils::generateRightTurnTrajectory(header);
+    traj_msg = test_utils::generateCurvatureTrajectory(header, -0.5, 4.0, 1.0);
     tester.traj_pub->publish(traj_msg);
   };
 

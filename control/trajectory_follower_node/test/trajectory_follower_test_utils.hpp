@@ -23,13 +23,16 @@
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
+#include <cmath>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace test_utils
 {
 using FakeNodeFixture = autoware::tools::testing::FakeTestNode;
 using TrajectoryPointArray = std::vector<autoware_auto_planning_msgs::msg::TrajectoryPoint>;
+using autoware_auto_planning_msgs::msg::Trajectory;
 using autoware_auto_planning_msgs::msg::TrajectoryPoint;
 
 inline void waitForMessage(
@@ -80,21 +83,35 @@ inline TrajectoryPoint make_traj_point(const double px, const double py, const f
   return p;
 }
 
-inline autoware_auto_planning_msgs::msg::Trajectory generateRightTurnTrajectory(std_msgs::msg::Header header)
+inline Trajectory generateCurvatureTrajectory(
+  std_msgs::msg::Header header, double curvature, double arc_length, double velocity)
 {
-  TrajectoryPointArray trajectory;
+  Trajectory trajectory;
+  trajectory.header = header;
 
-  trajectory.push_back(make_traj_point(-2.0, -2.0, 1.0f));
-  trajectory.push_back(make_traj_point(-1.8477590650225733, -1.2346331352698203, 1.0f));
-  trajectory.push_back(make_traj_point(-1.414213562373095, -0.5857864376269046, 1.0f));
-  trajectory.push_back(make_traj_point(-0.7653668647301795, -0.15224093497742652, 1.0f));
-  trajectory.push_back(make_traj_point(0.0, 0.0, 1.0f));
-  trajectory.push_back(make_traj_point(0.7653668647301797, -0.15224093497742675, 1.0f));
-  trajectory.push_back(make_traj_point(1.4142135623730954, -0.5857864376269049, 1.0f));
-  trajectory.push_back(make_traj_point(1.8477590650225733, -1.2346331352698203, 1.0f));
-  trajectory.push_back(make_traj_point(2.0, -2.0, 1.0f));
+  // Calculate radius from curvature
+  double radius =
+    1 / fabs(curvature);  // Radius is the reciprocal of the absolute value of curvature
+  double arc_angle = arc_length / radius;  // Total angle of the arc
 
-  return motion_utils::convertToTrajectory(trajectory, header);
+  // Calculate starting angle based on curvature
+  double start_angle = (curvature > 0) ? (3 * M_PI / 2) : (M_PI / 2);
+  start_angle -= arc_angle / 2;
+
+  const int points = 20;  // Number of points in the trajectory
+
+  // Generate points along the arc in reverse order
+  for (int i = points; i >= 0; --i) {
+    double angle = start_angle + (arc_angle * i / points);  // Current angle of the point on the arc
+    double x = radius * cos(angle);                         // X coordinate
+    double y = radius * sin(angle);                         // Y coordinate
+    // Adjust y-coordinate based on curvature sign
+    y += (curvature > 0) ? radius : -radius;
+
+    trajectory.points.push_back(make_traj_point(x, y, velocity));  // Speed set as per argument
+  }
+
+  return trajectory;
 }
 
 // TODO(Horibe): modify the controller nodes so that they does not publish topics when data is not
