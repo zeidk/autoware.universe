@@ -131,13 +131,56 @@ void writeTrajectoriesToFiles(
   const Trajectory & original_ref_trajectory, const Trajectory & resampled_ref_trajectory,
   const Trajectory & predicted_trajectory, const rclcpp::Time & stamp)
 {
-  std::ofstream output_file_orig_x("original_x.log");
-  std::ofstream output_file_orig_y("original_y.log");
-  std::ofstream output_file_resampled_x("resampled_x.log");
-  std::ofstream output_file_resampled_y("resampled_y.log");
-  std::ofstream output_file_predicted_x("predicted_x.log");
-  std::ofstream output_file_predicted_y("predicted_y.log");
-  std::ofstream output_file_time("time.log");
+  std::ifstream input_file_time("time.log");
+  std::string last_line;
+  std::string line;
+  if (input_file_time.is_open()) {
+    while (std::getline(input_file_time, line)) {
+      if (!line.empty()) {
+        last_line = line;
+      }
+    }
+    input_file_time.close();
+  }
+  std::cerr << "last_line: " << last_line << std::endl;
+
+  std::ofstream output_file_orig_x, output_file_orig_y, output_file_resampled_x,
+    output_file_resampled_y, output_file_predicted_x, output_file_predicted_y, output_file_time;
+
+  if (!last_line.empty()) {
+    double last_time_in_seconds = std::stod(last_line);
+    rclcpp::Time last_stamp(last_time_in_seconds);
+
+    double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
+    std::cerr << "last_stamp: " << last_time_in_seconds << std::endl;
+    std::cerr << "stamp: " << time_in_seconds << std::endl;
+
+    if (time_in_seconds - last_time_in_seconds <= 10.0) {
+      output_file_orig_x.open("original_x.log", std::ios::app);
+      output_file_orig_y.open("original_y.log", std::ios::app);
+      output_file_resampled_x.open("resampled_x.log", std::ios::app);
+      output_file_resampled_y.open("resampled_y.log", std::ios::app);
+      output_file_predicted_x.open("predicted_x.log", std::ios::app);
+      output_file_predicted_y.open("predicted_y.log", std::ios::app);
+      output_file_time.open("time.log", std::ios::app);
+    } else {
+      output_file_orig_x.open("original_x.log");
+      output_file_orig_y.open("original_y.log");
+      output_file_resampled_x.open("resampled_x.log");
+      output_file_resampled_y.open("resampled_y.log");
+      output_file_predicted_x.open("predicted_x.log");
+      output_file_predicted_y.open("predicted_y.log");
+      output_file_time.open("time.log");
+    }
+  } else {
+    output_file_orig_x.open("original_x.log");
+    output_file_orig_y.open("original_y.log");
+    output_file_resampled_x.open("resampled_x.log");
+    output_file_resampled_y.open("resampled_y.log");
+    output_file_predicted_x.open("predicted_x.log");
+    output_file_predicted_y.open("predicted_y.log");
+    output_file_time.open("time.log");
+  }
 
   auto original_ref_trajectory_it = original_ref_trajectory.points.begin();
   while (original_ref_trajectory_it != original_ref_trajectory.points.end()) {
@@ -166,7 +209,9 @@ void writeTrajectoriesToFiles(
   output_file_predicted_x << std::endl;
   output_file_predicted_y << std::endl;
 
-  output_file_time << stamp.seconds() << "." << stamp.nanoseconds() << std::endl;
+  // Calculate time in seconds as a double
+  double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
+  output_file_time << std::fixed << std::setprecision(3) << time_in_seconds << std::endl;
 }
 }  // namespace test_utils
 

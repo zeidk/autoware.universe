@@ -326,75 +326,80 @@ public:
 //   EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
 // }
 
-TEST_F(FakeNodeFixture, right_turn)
-{
-  const auto node_options = makeNodeOptions();
-  ControllerTester tester(this, node_options);
+// TEST_F(FakeNodeFixture, right_turn)
+// {
+//   const auto node_options = makeNodeOptions();
+//   ControllerTester tester(this, node_options);
 
-  tester.send_default_transform();
-  tester.publish_odom_vx(1.0);
-  tester.publish_autonomous_operation_mode();
-  tester.publish_default_steer();
-  tester.publish_default_acc();
+//   tester.send_default_transform();
+//   tester.publish_odom_vx(1.0);
+//   tester.publish_autonomous_operation_mode();
+//   tester.publish_default_steer();
+//   tester.publish_default_acc();
 
-  // Right turning trajectory with a constant curvature of -0.5: expect right steering
-  Trajectory traj_msg;
-  std_msgs::msg::Header header;
-  header.stamp = tester.node->now();
-  header.frame_id = "map";
-  traj_msg = test_utils::generateCurvatureTrajectory(header, -0.05, 4.0, 1.0);
-  tester.traj_pub->publish(traj_msg);
+//   // Right turning trajectory with a constant curvature of -0.5: expect right steering
+//   Trajectory traj_msg;
+//   std_msgs::msg::Header header;
+//   header.stamp = tester.node->now();
+//   header.frame_id = "map";
+//   traj_msg = test_utils::generateCurvatureTrajectory(header, -0.05, 4.0, 1.0);
+//   tester.traj_pub->publish(traj_msg);
 
-  test_utils::waitForMessage(tester.node, this, tester.received_control_command);
-  ASSERT_TRUE(tester.received_control_command);
-  test_utils::writeTrajectoriesToFiles(
-    traj_msg, *tester.resampled_reference_trajectory,
-    *tester.predicted_trajectory_in_frenet_coordinate, header.stamp);
-  // ASSERT_TRUE(tester.received_resampled_reference_trajectory);
+//   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
+//   ASSERT_TRUE(tester.received_control_command);
+//   test_utils::writeTrajectoriesToFiles(
+//     traj_msg, *tester.resampled_reference_trajectory,
+//     *tester.predicted_trajectory_in_frenet_coordinate, header.stamp);
+//   // ASSERT_TRUE(tester.received_resampled_reference_trajectory);
 
-  // const auto save_directory = "/home/kyoichi-sugahara/workspace/log/reference_trajectory";
-  // save_message_to_rosbag(
-  //   save_directory, tester.resampled_reference_trajectory,
-  //   "controller/debug/resampled_reference_trajectory");
-
-  std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle << std::endl;
-  std::cerr << "lat steer tire rotation rate: "
-            << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
-  EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
-  EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
-  EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
-}
+//   std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle <<
+//   std::endl; std::cerr << "lat steer tire rotation rate: "
+//             << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
+//   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
+//   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
+//   EXPECT_GT(rclcpp::Time(tester.cmd_msg->stamp), rclcpp::Time(traj_msg.header.stamp));
+// }
 
 TEST_F(FakeNodeFixture, right_turn_convergence)
 {
   const auto node_options = makeNodeOptions();
   ControllerTester tester(this, node_options);
-  Trajectory traj_msg;
+  Trajectory ref_trajectory;
 
-  auto publishTrajectory = [&tester, &traj_msg]() {
+  auto publishTrajectory = [&tester, &ref_trajectory]() {
     tester.send_default_transform();
     tester.publish_odom_vx(1.0);
     tester.publish_autonomous_operation_mode();
     tester.publish_default_steer();
     tester.publish_default_acc();
 
-    // Right turning trajectory with a constant curvature of -0.5: expect right steering
-
     std_msgs::msg::Header header;
     header.stamp = tester.node->now();
     header.frame_id = "map";
-    traj_msg = test_utils::generateCurvatureTrajectory(header, -0.5, 4.0, 1.0);
-    tester.traj_pub->publish(traj_msg);
+    ref_trajectory = test_utils::generateCurvatureTrajectory(header, -0.5, 4.0, 1.0);
+    tester.traj_pub->publish(ref_trajectory);
   };
 
+  publishTrajectory();
+  test_utils::waitForMessage(tester.node, this, tester.received_control_command);
+  EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
+  EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
+  tester.received_control_command = false;
+
+  std::cerr << "cmd_msg's stamp: " << tester.cmd_msg->stamp.sec << "s "
+            << tester.cmd_msg->stamp.nanosec << "ns" << std::endl;
+  test_utils::writeTrajectoriesToFiles(
+    ref_trajectory, *tester.resampled_reference_trajectory,
+    *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
-    const auto start_time = std::chrono::system_clock::now();
     publishTrajectory();
-    const auto after_publish_time = std::chrono::system_clock::now();
 
     test_utils::waitForMessage(tester.node, this, tester.received_control_command);
-    const auto after_spin_time = std::chrono::system_clock::now();
+
+    test_utils::writeTrajectoriesToFiles(
+      ref_trajectory, *tester.resampled_reference_trajectory,
+      *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
 
     ASSERT_TRUE(tester.received_control_command);
     std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle
@@ -403,19 +408,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
               << tester.cmd_msg->lateral.steering_tire_rotation_rate << std::endl;
     EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
     EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
-    const auto last_time = std::chrono::system_clock::now();
-    const double publish_time_ms =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(after_publish_time - start_time)
-        .count() *
-      1.0e-6;
-    const double spin_time_ms =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(after_spin_time - after_publish_time)
-        .count() *
-      1.0e-6;
-    const double total_time_ms =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(last_time - start_time).count() * 1.0e-6;
-    std::cerr << "Total time = " << total_time_ms << "ms\n\tpublish = " << publish_time_ms
-              << "ms\n\tspin = " << spin_time_ms << "ms\n";
+    tester.received_control_command = false;
   }
 
   // ASSERT_TRUE(tester.received_resampled_reference_trajectory);

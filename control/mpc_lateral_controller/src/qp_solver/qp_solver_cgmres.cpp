@@ -77,10 +77,10 @@ bool QPSolverCGMRES::solveCGMRES(
         .count() *
       1.0e-6;
     mpc_.update(time_from_last_initialized, x);
-    u = mpc_.uopt()[0];
-    RCLCPP_DEBUG(logger_, "\n\n\n time_from_last_initialized = %e \n", time_from_last_initialized);
-    RCLCPP_DEBUG(logger_, "updated u = %e \n\n\n", mpc_.uopt()[0].value());
-    // cgmres_logger_.save(
+    u = mpc_.uopt();
+    // RCLCPP_DEBUG(logger_, "\n\n\n time_from_last_initialized = %e \n",
+    // time_from_last_initialized); RCLCPP_DEBUG(logger_, "updated u = %e \n\n\n",
+    // mpc_.uopt()[0].value()); cgmres_logger_.save(
     //   time_from_last_initialized, x, mpc_.uopt()[0], mpc_.uopt(), mpc_.optError(),
     //   mpc_.normDiff(), mpc_.StandardDeviation());
   } else {
@@ -90,9 +90,10 @@ bool QPSolverCGMRES::solveCGMRES(
     initializer_.set_uc(uc0);
     const double t0 = 0.0;
     initializer_.solve(t0, x);
-    u = initializer_.uopt();
     mpc_.set_uc(initializer_.ucopt());
     mpc_.init_dummy_mu();
+    mpc_.update(time_from_last_initialized, x);
+    u = mpc_.uopt();
     RCLCPP_DEBUG(logger_, "\n\n\n u = %e \n\n\n", u(0));
   }
 

@@ -340,7 +340,7 @@ std::pair<bool, MPCTrajectory> MPC::resampleMPCTrajectoryByTime(
   }
   // Publish resampled reference trajectory for debug purpose.
   if (m_debug_publish_resampled_reference_trajectory) {
-    RCLCPP_DEBUG(m_logger, "publish resampled reference trajectory");
+    // RCLCPP_DEBUG(m_logger, "publish resampled reference trajectory");
     const auto converted_output = MPCUtils::convertToAutowareTrajectory(output);
     m_debug_resampled_reference_trajectory_pub->publish(converted_output);
   }
@@ -800,17 +800,51 @@ double MPC::calcDesiredSteeringRate(
     return (u_filtered - current_steer) / predict_dt;
   }
 
+  // check if predict_dt is valid
+  if (predict_dt <= 0.0) {
+    std::cerr << "Error: predict_dt must be positive." << std::endl;
+  }
+
   // calculate predicted states to get the steering motion
   const auto & m = mpc_matrix;
+
+  // check if the dimensions of x0 and Uex are valid
+  if (
+    x0.rows() != m.Aex.rows() || x0.cols() != 1 || Uex.rows() != m.Bex.cols() || Uex.cols() != 1) {
+    std::cerr << "Error: invalid dimensions of x0 or Uex." << std::endl;
+  }
+
   const MatrixXd Xex = m.Aex * x0 + m.Bex * Uex + m.Wex;
+  for (int i = 0; i < Xex.rows(); i++) {
+    std::cerr << "Xex(" << i << "): " << Xex(i, 0) << std::endl;
+  }
+  for (int i = 0; i < Uex.rows(); i++) {
+    std::cerr << "Uex(" << i << "): " << Uex(i, 0) << std::endl;
+  }
 
   const size_t STEER_IDX = 2;  // for kinematics model
+
+  // check if the steering index is within bounds
+  if (
+    static_cast<Eigen::Index>(STEER_IDX) >= x0.rows() ||
+    static_cast<Eigen::Index>(STEER_IDX) >= Xex.rows()) {
+    std::cerr << "Error: steering index out of bounds." << std::endl;
+  }
 
   const auto steer_0 = x0(STEER_IDX, 0);
   const auto steer_1 = Xex(STEER_IDX, 0);
 
+  // check if steer_0 and steer_1 are valid
+  if (std::isnan(steer_0) || std::isnan(steer_1)) {
+    std::cerr << "Error: steer_0 or steer_1 is nan." << std::endl;
+  }
+
   const auto steer_rate = (steer_1 - steer_0) / predict_dt;
 
+  std::cerr << "steer_0: " << steer_0 << std::endl;
+  std::cerr << "steer_1: " << steer_1 << std::endl;
+  std::cerr << "predict_dt: " << predict_dt << std::endl;
+  std::cerr << "steer_rate: " << steer_rate << std::endl;
   return steer_rate;
 }
 
