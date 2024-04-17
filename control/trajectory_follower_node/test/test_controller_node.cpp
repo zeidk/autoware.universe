@@ -69,8 +69,8 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
     enable_keep_stopped_until_steer_convergence);  // longitudinal
   node_options.arguments(
     {"--ros-args", "--params-file",
-     lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
-     //  lateral_share_dir + "/param/lateral_controller_defaults.param.yaml", "--params-file",
+     //  lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
+     lateral_share_dir + "/param/lateral_controller_defaults.param.yaml", "--params-file",
      longitudinal_share_dir + "/param/longitudinal_controller_defaults.param.yaml", "--params-file",
      share_dir + "/test/test_vehicle_info.param.yaml", "--params-file",
      share_dir + "/test/test_nearest_search.param.yaml", "--params-file",
@@ -154,6 +154,8 @@ public:
   bool received_resampled_reference_trajectory = false;
   Trajectory::SharedPtr predicted_trajectory_in_frenet_coordinate;
   bool received_predicted_trajectory_in_frenet_coordinate = false;
+  Trajectory::SharedPtr predicted_trajectory;
+  bool received_predicted_trajectory = false;
 
   void publish_default_odom()
   {
@@ -246,12 +248,20 @@ public:
         received_control_command = true;
       });
 
-  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_sub =
+  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_in_frenet_sub =
     fnf->create_subscription<Trajectory>(
       "controller/debug/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
       [this](const Trajectory::SharedPtr msg) {
         predicted_trajectory_in_frenet_coordinate = msg;
         received_predicted_trajectory_in_frenet_coordinate = true;
+      });
+
+  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_sub =
+    fnf->create_subscription<Trajectory>(
+      "controller/output/predicted_trajectory", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        predicted_trajectory = msg;
+        received_predicted_trajectory = true;
       });
 
   rclcpp::Subscription<Trajectory>::SharedPtr resampled_ref_traj_sub =
@@ -385,13 +395,11 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
   tester.received_control_command = false;
-  tester.received_resampled_reference_trajectory = false;
-  tester.received_predicted_trajectory_in_frenet_coordinate = false;
 
   std::cerr << "cmd_msg's stamp: " << tester.cmd_msg->stamp.sec << "s "
             << tester.cmd_msg->stamp.nanosec << "ns" << std::endl;
   test_utils::writeTrajectoriesToFiles(
-    ref_trajectory, *tester.resampled_reference_trajectory,
+    ref_trajectory, *tester.resampled_reference_trajectory, *tester.predicted_trajectory,
     *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
@@ -400,7 +408,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     test_utils::waitForMessage(tester.node, this, tester.received_control_command);
 
     test_utils::writeTrajectoriesToFiles(
-      ref_trajectory, *tester.resampled_reference_trajectory,
+      ref_trajectory, *tester.resampled_reference_trajectory, *tester.predicted_trajectory,
       *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
     ASSERT_TRUE(tester.received_control_command);
     std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle

@@ -129,7 +129,8 @@ inline void spinWhile(T & node)
 
 void writeTrajectoriesToFiles(
   const Trajectory & original_ref_trajectory, const Trajectory & resampled_ref_trajectory,
-  const Trajectory & predicted_trajectory, const rclcpp::Time & stamp)
+  const Trajectory & predicted_trajectory,
+  const Trajectory & predicted_trajectory_in_frenet_coordinate, const rclcpp::Time & stamp)
 {
   std::ifstream input_file_time("time.log");
   std::string last_line;
@@ -145,12 +146,12 @@ void writeTrajectoriesToFiles(
   std::cerr << "last_line: " << last_line << std::endl;
 
   std::ofstream output_file_orig_x, output_file_orig_y, output_file_resampled_x,
-    output_file_resampled_y, output_file_predicted_x, output_file_predicted_y, output_file_time;
+    output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
+    output_file_predicted_frenet_x, output_file_predicted_frenet_y, output_file_time;
 
   if (!last_line.empty()) {
     double last_time_in_seconds = std::stod(last_line);
     rclcpp::Time last_stamp(last_time_in_seconds);
-
     double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
     std::cerr << "last_stamp: " << last_time_in_seconds << std::endl;
     std::cerr << "stamp: " << time_in_seconds << std::endl;
@@ -162,6 +163,8 @@ void writeTrajectoriesToFiles(
       output_file_resampled_y.open("resampled_y.log", std::ios::app);
       output_file_predicted_x.open("predicted_x.log", std::ios::app);
       output_file_predicted_y.open("predicted_y.log", std::ios::app);
+      output_file_predicted_frenet_x.open("predicted_frenet_x.log", std::ios::app);
+      output_file_predicted_frenet_y.open("predicted_frenet_y.log", std::ios::app);
       output_file_time.open("time.log", std::ios::app);
     } else {
       output_file_orig_x.open("original_x.log");
@@ -170,6 +173,8 @@ void writeTrajectoriesToFiles(
       output_file_resampled_y.open("resampled_y.log");
       output_file_predicted_x.open("predicted_x.log");
       output_file_predicted_y.open("predicted_y.log");
+      output_file_predicted_frenet_x.open("predicted_frenet_x.log");
+      output_file_predicted_frenet_y.open("predicted_frenet_y.log");
       output_file_time.open("time.log");
     }
   } else {
@@ -179,6 +184,8 @@ void writeTrajectoriesToFiles(
     output_file_resampled_y.open("resampled_y.log");
     output_file_predicted_x.open("predicted_x.log");
     output_file_predicted_y.open("predicted_y.log");
+    output_file_predicted_frenet_x.open("predicted_frenet_x.log");
+    output_file_predicted_frenet_y.open("predicted_frenet_y.log");
     output_file_time.open("time.log");
   }
 
@@ -208,6 +215,15 @@ void writeTrajectoriesToFiles(
   }
   output_file_predicted_x << std::endl;
   output_file_predicted_y << std::endl;
+
+  auto pred_frenet_it = predicted_trajectory_in_frenet_coordinate.points.begin();
+  while (pred_frenet_it != predicted_trajectory_in_frenet_coordinate.points.end()) {
+    output_file_predicted_frenet_x << pred_frenet_it->pose.position.x << ",";
+    output_file_predicted_frenet_y << pred_frenet_it->pose.position.y << ",";
+    ++pred_frenet_it;
+  }
+  output_file_predicted_frenet_x << std::endl;
+  output_file_predicted_frenet_y << std::endl;
 
   // Calculate time in seconds as a double
   double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;

@@ -84,10 +84,6 @@ bool MPC::calculateMPC(
   // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
   const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
 
-  // for (Eigen::Index i = 0; i < x0_delayed.size(); ++i) {
-  //   RCLCPP_DEBUG(m_logger, "x0_delayed [%ld]: %f", i, x0_delayed(i));
-  // }
-
   if (qp_solver_type == "cgmres") {
     std::tie(success_opt, Uex) = executeOptimization(
       x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
