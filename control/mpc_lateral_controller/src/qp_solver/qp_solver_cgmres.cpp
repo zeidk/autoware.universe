@@ -68,6 +68,7 @@ bool QPSolverCGMRES::solveCGMRES(
   if (!is_initialized_) {
     initialized_time_ = std::chrono::system_clock::now();
     is_initialized_ = true;
+  } else {
   }
 
   if (warm_start) {
@@ -77,7 +78,13 @@ bool QPSolverCGMRES::solveCGMRES(
         .count() *
       1.0e-6;
     mpc_.update(time_from_last_initialized, x);
-    u = mpc_.uopt();
+    std::vector<double> U_cgmres(mpc_.uopt().size());
+    for (size_t i = 0; i < mpc_.uopt().size(); ++i) {
+      U_cgmres[i] = mpc_.uopt()[i](0);
+    }
+    u = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, 1>>(
+      &U_cgmres[0], static_cast<Eigen::Index>(U_cgmres.size()), 1);
+
     // RCLCPP_DEBUG(logger_, "\n\n\n time_from_last_initialized = %e \n",
     // time_from_last_initialized); RCLCPP_DEBUG(logger_, "updated u = %e \n\n\n",
     // mpc_.uopt()[0].value()); cgmres_logger_.save(
@@ -92,8 +99,14 @@ bool QPSolverCGMRES::solveCGMRES(
     initializer_.solve(t0, x);
     mpc_.set_uc(initializer_.ucopt());
     mpc_.init_dummy_mu();
-    mpc_.update(time_from_last_initialized, x);
-    u = mpc_.uopt();
+    mpc_.update(t0, x);
+    std::vector<double> U_cgmres(mpc_.uopt().size());
+    for (size_t i = 0; i < mpc_.uopt().size(); ++i) {
+      U_cgmres[i] = mpc_.uopt()[i](0);
+    }
+    u = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, 1>>(
+      &U_cgmres[0], static_cast<Eigen::Index>(U_cgmres.size()), 1);
+
     RCLCPP_DEBUG(logger_, "\n\n\n u = %e \n\n\n", u(0));
   }
 
