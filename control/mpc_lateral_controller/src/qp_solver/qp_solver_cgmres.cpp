@@ -85,9 +85,9 @@ bool QPSolverCGMRES::solveCGMRES(
     u = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, 1>>(
       &U_cgmres[0], static_cast<Eigen::Index>(U_cgmres.size()), 1);
 
-    // RCLCPP_DEBUG(logger_, "\n\n\n time_from_last_initialized = %e \n",
-    // time_from_last_initialized); RCLCPP_DEBUG(logger_, "updated u = %e \n\n\n",
-    // mpc_.uopt()[0].value()); cgmres_logger_.save(
+    // RCLCPP_DEBUG(logger_, " time_from_last_initialized = %e \n", time_from_last_initialized);
+    // RCLCPP_DEBUG(logger_, "updated u = %e ",mpc_.uopt()[0].value());
+    // cgmres_logger_.save(
     //   time_from_last_initialized, x, mpc_.uopt()[0], mpc_.uopt(), mpc_.optError(),
     //   mpc_.normDiff(), mpc_.StandardDeviation());
   } else {
@@ -107,11 +107,8 @@ bool QPSolverCGMRES::solveCGMRES(
     u = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, 1>>(
       &U_cgmres[0], static_cast<Eigen::Index>(U_cgmres.size()), 1);
 
-    RCLCPP_DEBUG(logger_, "\n\n\n u = %e \n\n\n", u(0));
+    // RCLCPP_DEBUG(logger_, " u = %e ", u(0));
   }
-
-  // std::cout << "MPC used in this simulation:" << std::endl;
-  // std::cout << mpc_ << std::endl;
   return true;
 }
 
