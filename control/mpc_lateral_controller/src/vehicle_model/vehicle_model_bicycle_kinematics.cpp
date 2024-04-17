@@ -149,4 +149,64 @@ MPCTrajectory KinematicsBicycleModel::calculatePredictedTrajectoryInFrenetCoordi
   }
   return mpc_predicted_trajectory;
 }
+
+// MPCTrajectory KinematicsBicycleModel::calculatePredictedTrajectoryInFrenetCoordinate(
+//   const Eigen::MatrixXd & a_d, const Eigen::MatrixXd & b_d,
+//   [[maybe_unused]] const Eigen::MatrixXd & c_d, const Eigen::MatrixXd & w_d,
+//   const Eigen::MatrixXd & x0, const Eigen::MatrixXd & Uex,
+//   const MPCTrajectory & reference_trajectory, [[maybe_unused]] const double dt) const
+// {
+//   MPCTrajectory mpc_predicted_trajectory;
+//   const auto DIM_U = getDimU();
+
+//   const auto & t = reference_trajectory;
+//   for (size_t i = 0; i < static_cast<size_t>(x0.size()); ++i) {
+//     std::cerr << "x0 in publisher: " << x0(i) << std::endl;
+//   }
+//   std::cerr << "x0's size: " << x0.size() << std::endl;
+
+//   const auto ini_x = t.x.at(0);
+//   const auto ini_y = x0(0);
+//   const auto ini_yaw = x0(1);
+//   const auto ini_steer = x0(2);
+//   mpc_predicted_trajectory.push_back(
+//     ini_x, ini_y, t.z.at(0), ini_yaw, t.vx.at(0), t.k.at(0), t.smooth_k.at(0),
+//     t.relative_time.at(0));
+
+//   Eigen::VectorXd state_w = Eigen::VectorXd::Zero(4);
+//   state_w(0, 0) = ini_x;
+//   state_w(1, 0) = ini_y;
+//   state_w(2, 0) = ini_yaw;
+//   state_w(3, 0) = ini_steer;
+//   std::cerr << "init_yaw: " << ini_yaw << std::endl;
+//   std::cerr << "trajectory_init_yaw: " << t.yaw.at(0) << std::endl;
+
+//   // update state in the world coordinate
+//   const auto updateState = [&](
+//                              const Eigen::VectorXd & state_w, const Eigen::MatrixXd & input,
+//                              const double dt, const double velocity) {
+//     const auto yaw = state_w(2);
+//     const auto steer = state_w(3);
+//     const auto desired_steer = input(0);
+
+//     Eigen::VectorXd dstate = Eigen::VectorXd::Zero(4);
+//     dstate(0) = velocity * std::cos(yaw);
+//     dstate(1) = velocity * std::sin(yaw);
+//     dstate(2) = velocity * std::tan(steer) / m_wheelbase;
+//     dstate(3) = -(steer - desired_steer) / m_steer_tau;
+//     std::cerr << "velocity: " << velocity << std::endl;
+
+//     const Eigen::VectorXd next_state = state_w + dstate * dt;
+//     return next_state;
+//   };
+
+//   for (size_t i = 1; i < reference_trajectory.size(); ++i) {
+//     state_w = updateState(state_w, Uex.block(i - 1 * DIM_U, 0, DIM_U, 1), dt, 1.0);
+//     mpc_predicted_trajectory.push_back(
+//       state_w(0), state_w(1), t.z.at(i), state_w(2), t.vx.at(i), t.k.at(i), t.smooth_k.at(i),
+//       t.relative_time.at(i));
+//   }
+
+//   return mpc_predicted_trajectory;
+// }
 }  // namespace autoware::motion::control::mpc_lateral_controller

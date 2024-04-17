@@ -385,6 +385,8 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
   tester.received_control_command = false;
+  tester.received_resampled_reference_trajectory = false;
+  tester.received_predicted_trajectory_in_frenet_coordinate = false;
 
   std::cerr << "cmd_msg's stamp: " << tester.cmd_msg->stamp.sec << "s "
             << tester.cmd_msg->stamp.nanosec << "ns" << std::endl;
@@ -395,13 +397,11 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
   for (size_t i = 0; i < iter_num; i++) {
     curvature_sign = curvature_sign - 0.01;
     publishTrajectory(curvature_sign);
-
     test_utils::waitForMessage(tester.node, this, tester.received_control_command);
 
     test_utils::writeTrajectoriesToFiles(
       ref_trajectory, *tester.resampled_reference_trajectory,
       *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
-
     ASSERT_TRUE(tester.received_control_command);
     std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle
               << std::endl;

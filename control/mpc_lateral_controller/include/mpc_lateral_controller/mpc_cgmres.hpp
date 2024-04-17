@@ -72,7 +72,7 @@ public:
   double v_in_reference_trajectory = 1.0;
   double curvature_in_reference_trajectory = -0.5;
   double smoothed_curvature_in_reference_trajectory = -0.5;
-  double wheel_base = 2.79;  // arctan(wheel base * curvature_in_reference_trajectory)
+  double wheel_base = 2.74;  // arctan(wheel base * curvature_in_reference_trajectory)
   double tau_ = 0.3;
 
   std::array<double, 3> q = {1.0, 0.1, 0.0};

@@ -37,6 +37,8 @@ ax.set_title("Trajectory Comparison")
 ax.legend()
 ax.grid(True)
 
+# plt.gca().set_aspect('equal', adjustable='box')
+
 slider_ax = plt.axes([0.2, 0.05, 0.6, 0.03])
 time_slider = Slider(slider_ax, "Time", 0, len(time_data) - 1, valinit=0, valstep=1)
 
@@ -61,4 +63,5 @@ def update(time_index):
 time_slider.on_changed(update)
 
 update(0)
+
 plt.show()
