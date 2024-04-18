@@ -225,6 +225,9 @@ private:
 
   rclcpp::Publisher<Trajectory>::SharedPtr m_debug_frenet_predicted_trajectory_pub;
   rclcpp::Publisher<Trajectory>::SharedPtr m_debug_resampled_reference_trajectory_pub;
+  rclcpp::Publisher<Trajectory>::SharedPtr m_debug_cgmres_frenet_predicted_trajectory_pub;
+  rclcpp::Publisher<Trajectory>::SharedPtr m_debug_cgmres_predicted_trajectory_pub;
+
   /**
    * @brief Get variables for MPC calculation.
    * @param trajectory The reference trajectory.
@@ -362,6 +365,10 @@ private:
   Trajectory calculatePredictedTrajectory(
     const MPCMatrix & mpc_matrix, const Eigen::MatrixXd & x0, const Eigen::MatrixXd & Uex,
     const MPCTrajectory & mpc_resampled_ref_traj, const double dt) const;
+
+  Trajectory calculatePredictedTrajectory(
+    const MPCMatrix & mpc_matrix, const Eigen::MatrixXd & x0, const Eigen::MatrixXd & Ugmres,
+    const MPCTrajectory & reference_trajectory, const double dt, const double passed_time) const;
 
   /**
    * @brief Check if the MPC matrix has any invalid values.

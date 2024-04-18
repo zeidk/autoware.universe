@@ -69,8 +69,8 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
     enable_keep_stopped_until_steer_convergence);  // longitudinal
   node_options.arguments(
     {"--ros-args", "--params-file",
-     //  lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
-     lateral_share_dir + "/param/lateral_controller_defaults.param.yaml", "--params-file",
+     lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
+     //  lateral_share_dir + "/param/lateral_controller_defaults.param.yaml", "--params-file",
      longitudinal_share_dir + "/param/longitudinal_controller_defaults.param.yaml", "--params-file",
      share_dir + "/test/test_vehicle_info.param.yaml", "--params-file",
      share_dir + "/test/test_nearest_search.param.yaml", "--params-file",
@@ -156,6 +156,10 @@ public:
   bool received_predicted_trajectory_in_frenet_coordinate = false;
   Trajectory::SharedPtr predicted_trajectory;
   bool received_predicted_trajectory = false;
+  Trajectory::SharedPtr cgmres_predicted_trajectory_in_frenet_coordinate;
+  bool received_cgmres_predicted_trajectory_in_frenet_coordinate = false;
+  Trajectory::SharedPtr cgmres_predicted_trajectory;
+  bool received_cgmres_predicted_trajectory = false;
 
   void publish_default_odom()
   {
@@ -262,6 +266,21 @@ public:
       [this](const Trajectory::SharedPtr msg) {
         predicted_trajectory = msg;
         received_predicted_trajectory = true;
+      });
+  rclcpp::Subscription<Trajectory>::SharedPtr cgmres_predicted_traj_in_frenet_sub =
+    fnf->create_subscription<Trajectory>(
+      "controller/debug/cgmres/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        cgmres_predicted_trajectory_in_frenet_coordinate = msg;
+        received_cgmres_predicted_trajectory_in_frenet_coordinate = true;
+      });
+
+  rclcpp::Subscription<Trajectory>::SharedPtr cgmres_predicted_traj_sub =
+    fnf->create_subscription<Trajectory>(
+      "controller/debug/cgmres/predicted_trajectory", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        cgmres_predicted_trajectory = msg;
+        received_cgmres_predicted_trajectory = true;
       });
 
   rclcpp::Subscription<Trajectory>::SharedPtr resampled_ref_traj_sub =
@@ -386,7 +405,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     std_msgs::msg::Header header;
     header.stamp = tester.node->now();
     header.frame_id = "map";
-    ref_trajectory = test_utils::generateCurvatureTrajectory(header, curvature_sign, 4.0, 1.0);
+    ref_trajectory = test_utils::generateCurvatureTrajectory(header, curvature_sign, 5.0, 1.0);
     tester.traj_pub->publish(ref_trajectory);
   };
   double curvature_sign = -0.1;
@@ -400,7 +419,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
             << tester.cmd_msg->stamp.nanosec << "ns" << std::endl;
   test_utils::writeTrajectoriesToFiles(
     ref_trajectory, *tester.resampled_reference_trajectory, *tester.predicted_trajectory,
-    *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
+    *tester.predicted_trajectory_in_frenet_coordinate,
+    *tester.cgmres_predicted_trajectory_in_frenet_coordinate, *tester.cgmres_predicted_trajectory,
+    tester.cmd_msg->stamp);
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
     curvature_sign = curvature_sign - 0.01;
@@ -409,7 +430,9 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
 
     test_utils::writeTrajectoriesToFiles(
       ref_trajectory, *tester.resampled_reference_trajectory, *tester.predicted_trajectory,
-      *tester.predicted_trajectory_in_frenet_coordinate, tester.cmd_msg->stamp);
+      *tester.predicted_trajectory_in_frenet_coordinate,
+      *tester.cgmres_predicted_trajectory_in_frenet_coordinate, *tester.cgmres_predicted_trajectory,
+      tester.cmd_msg->stamp);
     ASSERT_TRUE(tester.received_control_command);
     std::cerr << "lat steer tire angle: " << tester.cmd_msg->lateral.steering_tire_angle
               << std::endl;

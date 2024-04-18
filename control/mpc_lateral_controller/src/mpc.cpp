@@ -37,6 +37,13 @@ MPC::MPC(rclcpp::Node & node)
 {
   m_debug_frenet_predicted_trajectory_pub = node.create_publisher<Trajectory>(
     "~/debug/predicted_trajectory_in_frenet_coordinate", rclcpp::QoS(1));
+  node.create_publisher<Trajectory>("~/debug/resampled_reference_trajectory", rclcpp::QoS(1));
+  m_debug_cgmres_frenet_predicted_trajectory_pub = node.create_publisher<Trajectory>(
+    "~/debug/cgmres/predicted_trajectory_in_frenet_coordinate", rclcpp::QoS(1));
+  node.create_publisher<Trajectory>("~/debug/resampled_reference_trajectory", rclcpp::QoS(1));
+  m_debug_cgmres_predicted_trajectory_pub =
+    node.create_publisher<Trajectory>("~/debug/cgmres/predicted_trajectory", rclcpp::QoS(1));
+
   m_debug_resampled_reference_trajectory_pub =
     node.create_publisher<Trajectory>("~/debug/resampled_reference_trajectory", rclcpp::QoS(1));
 }
@@ -61,9 +68,12 @@ bool MPC::calculateMPC(
   // calculate initial state of the error dynamics
   const auto x0 = getInitialState(mpc_data);
 
+  const bool success_delay = true;
+  const VectorXd x0_delayed = x0;
   // apply time delay compensation to the initial state
-  const auto [success_delay, x0_delayed] =
-    updateStateForDelayCompensation(reference_trajectory, mpc_data.nearest_time, x0);
+  // const auto [success_delay, x0_delayed] =
+  //   updateStateForDelayCompensation(reference_trajectory, mpc_data.nearest_time, x0);
+
   if (!success_delay) {
     return fail_warn_throttle("delay compensation failed. Stop MPC.");
   }
@@ -79,24 +89,26 @@ bool MPC::calculateMPC(
     return fail_warn_throttle("trajectory resampling failed. Stop MPC.");
   }
 
-  bool success_opt = false;
-  VectorXd Uex;
   // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
   const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
 
-  if (qp_solver_type == "cgmres") {
-    std::tie(success_opt, Uex) = executeOptimization(
-      x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
-      current_kinematics.twist.twist.linear.x);
-
-  } else {
-    // solve Optimization problem
-    std::tie(success_opt, Uex) = executeOptimization(
-      mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
-      current_kinematics.twist.twist.linear.x);
-  }
+  // solve Optimization problem
+  const auto [success_opt, Uex] = executeOptimization(
+    mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+    current_kinematics.twist.twist.linear.x);
   if (!success_opt) {
     return fail_warn_throttle("optimization failed. Stop MPC.");
+  }
+
+  if (qp_solver_type == "cgmres") {
+    double success_opt;
+    VectorXd Ugmres;
+    std::tie(success_opt, Ugmres) = executeOptimization(
+      x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
+      current_kinematics.twist.twist.linear.x);
+    /* calculate predicted trajectory */
+    predicted_trajectory = calculatePredictedTrajectory(
+      mpc_matrix, x0, Ugmres, mpc_resampled_ref_trajectory, prediction_dt, 1.0);
   }
 
   // apply filters for the input limitation and low pass filter
@@ -239,15 +251,6 @@ void MPC::setReferenceTrajectory(
   // calculate curvature
   MPCUtils::calcTrajectoryCurvature(
     param.curvature_smoothing_num_traj, param.curvature_smoothing_num_ref_steer, mpc_traj_smoothed);
-  // auto calculate_mean = [](const std::vector<double> & v) {
-  //   double sum = std::accumulate(v.begin(), v.end(), 0.0);
-  //   return sum / v.size();
-  // };
-  // RCLCPP_DEBUG(
-  //   m_logger, "mpc_traj_smoothed's average curvature: %f", calculate_mean(mpc_traj_smoothed.k));
-  // RCLCPP_DEBUG(
-  //   m_logger, "mpc_traj_smoothed's average smooth curvature: %f",
-  //   calculate_mean(mpc_traj_smoothed.smooth_k));
 
   // stop velocity at a terminal point
   mpc_traj_smoothed.vx.back() = 0.0;
@@ -336,7 +339,6 @@ std::pair<bool, MPCTrajectory> MPC::resampleMPCTrajectoryByTime(
   }
   // Publish resampled reference trajectory for debug purpose.
   if (m_debug_publish_resampled_reference_trajectory) {
-    // RCLCPP_DEBUG(m_logger, "publish resampled reference trajectory");
     const auto converted_output = MPCUtils::convertToAutowareTrajectory(output);
     m_debug_resampled_reference_trajectory_pub->publish(converted_output);
   }
@@ -796,14 +798,8 @@ double MPC::calcDesiredSteeringRate(
     return (u_filtered - current_steer) / predict_dt;
   }
 
-  // check if predict_dt is valid
-  if (predict_dt <= 0.0) {
-    std::cerr << "Error: predict_dt must be positive." << std::endl;
-  }
-
   // calculate predicted states to get the steering motion
   const auto & m = mpc_matrix;
-
   const MatrixXd Xex = m.Aex * x0 + m.Bex * Uex + m.Wex;
 
   const size_t STEER_IDX = 2;  // for kinematics model
@@ -893,6 +889,34 @@ Trajectory MPC::calculatePredictedTrajectory(
       MPCUtils::clipTrajectoryByLength(frenet, predicted_length));
     m_debug_frenet_predicted_trajectory_pub->publish(frenet_clipped);
   }
+
+  return predicted_trajectory;
+}
+
+Trajectory MPC::calculatePredictedTrajectory(
+  const MPCMatrix & mpc_matrix, const Eigen::MatrixXd & x0, const Eigen::MatrixXd & Ugmres,
+  const MPCTrajectory & reference_trajectory, const double dt,
+  [[maybe_unused]] const double passed_time) const
+{
+  const auto predicted_mpc_trajectory =
+    m_vehicle_model_ptr->calculatePredictedTrajectoryInWorldCoordinate(
+      mpc_matrix.Aex, mpc_matrix.Bex, mpc_matrix.Cex, mpc_matrix.Wex, x0, Ugmres,
+      reference_trajectory, dt);
+
+  // do not over the reference trajectory
+  const auto predicted_length = MPCUtils::calcMPCTrajectoryArcLength(reference_trajectory);
+  const auto clipped_trajectory =
+    MPCUtils::clipTrajectoryByLength(predicted_mpc_trajectory, predicted_length);
+
+  const auto predicted_trajectory = MPCUtils::convertToAutowareTrajectory(clipped_trajectory);
+  m_debug_cgmres_frenet_predicted_trajectory_pub->publish(predicted_trajectory);
+  // Publish trajectory in relative coordinate for debug purpose.
+  const auto frenet = m_vehicle_model_ptr->calculatePredictedTrajectoryInFrenetCoordinate(
+    mpc_matrix.Aex, mpc_matrix.Bex, mpc_matrix.Cex, mpc_matrix.Wex, x0, Ugmres,
+    reference_trajectory, dt);
+  const auto frenet_clipped = MPCUtils::convertToAutowareTrajectory(
+    MPCUtils::clipTrajectoryByLength(frenet, predicted_length));
+  m_debug_cgmres_predicted_trajectory_pub->publish(frenet_clipped);
 
   return predicted_trajectory;
 }

@@ -130,7 +130,9 @@ inline void spinWhile(T & node)
 void writeTrajectoriesToFiles(
   const Trajectory & original_ref_trajectory, const Trajectory & resampled_ref_trajectory,
   const Trajectory & predicted_trajectory,
-  const Trajectory & predicted_trajectory_in_frenet_coordinate, const rclcpp::Time & stamp)
+  const Trajectory & predicted_trajectory_in_frenet_coordinate,
+  const Trajectory & cgmres_predicted_trajectory_in_frenet_coordinate,
+  const Trajectory & cgmres_predicted_trajectory, const rclcpp::Time & stamp)
 {
   std::ifstream input_file_time("time.log");
   std::string last_line;
@@ -144,10 +146,11 @@ void writeTrajectoriesToFiles(
     input_file_time.close();
   }
   std::cerr << "last_line: " << last_line << std::endl;
-
   std::ofstream output_file_orig_x, output_file_orig_y, output_file_resampled_x,
     output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
-    output_file_predicted_frenet_x, output_file_predicted_frenet_y, output_file_time;
+    output_file_predicted_frenet_x, output_file_predicted_frenet_y,
+    output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
+    output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time;
 
   if (!last_line.empty()) {
     double last_time_in_seconds = std::stod(last_line);
@@ -165,6 +168,10 @@ void writeTrajectoriesToFiles(
       output_file_predicted_y.open("predicted_y.log", std::ios::app);
       output_file_predicted_frenet_x.open("predicted_frenet_x.log", std::ios::app);
       output_file_predicted_frenet_y.open("predicted_frenet_y.log", std::ios::app);
+      output_file_cgmres_predicted_frenet_x.open("cgmres_predicted_frenet_x.log", std::ios::app);
+      output_file_cgmres_predicted_frenet_y.open("cgmres_predicted_frenet_y.log", std::ios::app);
+      output_file_cgmres_predicted_x.open("cgmres_predicted_x.log", std::ios::app);
+      output_file_cgmres_predicted_y.open("cgmres_predicted_y.log", std::ios::app);
       output_file_time.open("time.log", std::ios::app);
     } else {
       output_file_orig_x.open("original_x.log");
@@ -175,6 +182,10 @@ void writeTrajectoriesToFiles(
       output_file_predicted_y.open("predicted_y.log");
       output_file_predicted_frenet_x.open("predicted_frenet_x.log");
       output_file_predicted_frenet_y.open("predicted_frenet_y.log");
+      output_file_cgmres_predicted_frenet_x.open("cgmres_predicted_frenet_x.log");
+      output_file_cgmres_predicted_frenet_y.open("cgmres_predicted_frenet_y.log");
+      output_file_cgmres_predicted_x.open("cgmres_predicted_x.log");
+      output_file_cgmres_predicted_y.open("cgmres_predicted_y.log");
       output_file_time.open("time.log");
     }
   } else {
@@ -186,6 +197,10 @@ void writeTrajectoriesToFiles(
     output_file_predicted_y.open("predicted_y.log");
     output_file_predicted_frenet_x.open("predicted_frenet_x.log");
     output_file_predicted_frenet_y.open("predicted_frenet_y.log");
+    output_file_cgmres_predicted_frenet_x.open("cgmres_predicted_frenet_x.log");
+    output_file_cgmres_predicted_frenet_y.open("cgmres_predicted_frenet_y.log");
+    output_file_cgmres_predicted_x.open("cgmres_predicted_x.log");
+    output_file_cgmres_predicted_y.open("cgmres_predicted_y.log");
     output_file_time.open("time.log");
   }
 
@@ -224,6 +239,24 @@ void writeTrajectoriesToFiles(
   }
   output_file_predicted_frenet_x << std::endl;
   output_file_predicted_frenet_y << std::endl;
+
+  auto cgmres_pred_frenet_it = cgmres_predicted_trajectory_in_frenet_coordinate.points.begin();
+  while (cgmres_pred_frenet_it != cgmres_predicted_trajectory_in_frenet_coordinate.points.end()) {
+    output_file_cgmres_predicted_frenet_x << cgmres_pred_frenet_it->pose.position.x << ",";
+    output_file_cgmres_predicted_frenet_y << cgmres_pred_frenet_it->pose.position.y << ",";
+    ++cgmres_pred_frenet_it;
+  }
+  output_file_cgmres_predicted_frenet_x << std::endl;
+  output_file_cgmres_predicted_frenet_y << std::endl;
+
+  auto cgmres_pred_it = cgmres_predicted_trajectory.points.begin();
+  while (cgmres_pred_it != cgmres_predicted_trajectory.points.end()) {
+    output_file_cgmres_predicted_x << cgmres_pred_it->pose.position.x << ",";
+    output_file_cgmres_predicted_y << cgmres_pred_it->pose.position.y << ",";
+    ++cgmres_pred_it;
+  }
+  output_file_cgmres_predicted_x << std::endl;
+  output_file_cgmres_predicted_y << std::endl;
 
   // Calculate time in seconds as a double
   double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
