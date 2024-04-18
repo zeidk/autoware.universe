@@ -65,6 +65,7 @@ bool QPSolverCGMRES::solveCGMRES(
   std::cerr << "average_curvature: " << average_curvature << std::endl;
   std::cerr << "ocp_.u_ref[0]: " << ocp_.u_ref[0] << std::endl;
   ocp_.disp(std::cerr);
+  mpc_.disp(std::cerr);
 
   if (!is_initialized_) {
     initialized_time_ = std::chrono::system_clock::now();

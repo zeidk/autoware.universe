@@ -408,7 +408,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     ref_trajectory = test_utils::generateCurvatureTrajectory(header, curvature_sign, 5.0, 1.0);
     tester.traj_pub->publish(ref_trajectory);
   };
-  double curvature_sign = -0.1;
+  double curvature_sign = -0.05;
   publishTrajectory(curvature_sign);
   test_utils::waitForMessage(tester.node, this, tester.received_control_command);
   EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);

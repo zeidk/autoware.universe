@@ -90,21 +90,21 @@ bool MPC::calculateMPC(
   }
 
   auto start_time_osqp = std::chrono::high_resolution_clock::now();
+
   // generate mpc matrix : predict equation Xec = Aex * x0 + Bex * Uex + Wex
   const auto mpc_matrix = generateMPCMatrix(mpc_resampled_ref_trajectory, prediction_dt);
   auto end_time_generate_matrix = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+  auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(
     end_time_generate_matrix - start_time_osqp);
-  RCLCPP_DEBUG(m_logger, "generateMPCMatrix time = %ld [ms]", duration.count());
+  RCLCPP_DEBUG(m_logger, "generateMPCMatrix time = %ld [ns]", duration.count());
 
   // solve Optimization problem
   const auto [success_opt, Uex] = executeOptimization(
     mpc_matrix, x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
     current_kinematics.twist.twist.linear.x);
-  end_time_osqp = std::chrono::high_resolution_clock::now();
-  duration = std::chrono::duration_cast<std::chrono::microseconds>(start_time_osqp - end_time_osqp);
-  RCLCPP_DEBUG(m_logger, "executeOptimization time = %ld [ms]", duration.count());
-  // std::cout << "executeOptimization time: " << duration.count() << " microseconds" << std::endl;
+  auto end_time_osqp = std::chrono::high_resolution_clock::now();
+  duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_osqp - start_time_osqp);
+  RCLCPP_DEBUG(m_logger, "executeOptimization time = %ld [ns]", duration.count());
 
   if (!success_opt) {
     return fail_warn_throttle("optimization failed. Stop MPC.");
@@ -113,15 +113,14 @@ bool MPC::calculateMPC(
   if (qp_solver_type == "cgmres") {
     double success_opt;
     VectorXd Ugmres;
-    start_time_cgmres = std::chrono::high_resolution_clock::now();
+    auto start_time_cgmres = std::chrono::high_resolution_clock::now();
     std::tie(success_opt, Ugmres) = executeOptimization(
       x0_delayed, prediction_dt, mpc_resampled_ref_trajectory,
       current_kinematics.twist.twist.linear.x);
-    end_time_cgmres = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time_cgmres);
-    std::cout << "executeOptimization (cgmres) time: " << duration.count() << " microseconds"
-              << std::endl;
-    RCLCPP_DEBUG(m_logger, "executeOptimization (cgmres) time = %ld [ms]", duration.count());
+    auto end_time_cgmres = std::chrono::high_resolution_clock::now();
+    duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_cgmres - start_time_cgmres);
+    RCLCPP_DEBUG(m_logger, "executeOptimization (cgmres) time = %ld [ns]", duration.count());
 
     /* calculate predicted trajectory */
     predicted_trajectory = calculatePredictedTrajectory(
@@ -630,16 +629,16 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   ubA(0) = m_raw_steer_cmd_prev + steer_rate_limits(0) * m_ctrl_period;
   lbA(0) = m_raw_steer_cmd_prev - steer_rate_limits(0) * m_ctrl_period;
 
-  auto t_start = std::chrono::system_clock::now();
+  // auto t_start = std::chrono::system_clock::now();
   bool solve_result = m_qpsolver_ptr->solve(H, f.transpose(), A, lb, ub, lbA, ubA, Uex);
-  auto t_end = std::chrono::system_clock::now();
+  // auto t_end = std::chrono::system_clock::now();
   if (!solve_result) {
     warn_throttle("qp solver error");
     return {false, {}};
   }
 
   {
-    auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+    // auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
     // RCLCPP_DEBUG(m_logger, "qp solver calculation time = %ld [ms]", t);
   }
 
@@ -673,7 +672,7 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
     1.0e-6;
   std::cerr << "time from last optimal solution [ms]: " << elapsed_time_ms << std::endl;
 
-  auto t_start = std::chrono::system_clock::now();
+  // auto t_start = std::chrono::system_clock::now();
   bool solve_result = false;
   bool warm_start = false;
 
@@ -685,14 +684,14 @@ std::pair<bool, VectorXd> MPC::executeOptimization(
   }
 
   solve_result = m_qpsolver_ptr->solveCGMRES(x0, resampled_ref_trajectory, DT, Uex, warm_start);
-  auto t_end = std::chrono::system_clock::now();
+  // auto t_end = std::chrono::system_clock::now();
 
   if (!solve_result) {
     warn_throttle("qp solver error");
     return {false, {}};
   }
 
-  auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
+  // auto t = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count();
   // RCLCPP_DEBUG(m_logger, "cgmres solver calculation time = %ld [ms]", t);
 
   if (Uex.array().isNaN().any()) {
