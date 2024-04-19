@@ -25,6 +25,8 @@
 #include "osqp_interface/osqp_interface.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include <string>
+
 namespace autoware::motion::control::mpc_lateral_controller
 {
 
@@ -70,7 +72,7 @@ public:
 private:
   autoware::common::osqp::OSQPInterface cgmressolver_;
   cgmres::OCP_lateral_control ocp_;
-  cgmres::SolverSettings settings_;
+  std::string log_dir_;
 
   static constexpr int N = 50;         // CGMRESソルバーの予測ステップ数
   static constexpr int kmax = 5;       // CGMRESソルバーの最大反復回数
@@ -78,6 +80,7 @@ private:
 
   rclcpp::Logger logger_;
   cgmres::Logger cgmres_logger_;
+  cgmres::SolverSettings settings_;
   cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc_;
   cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer_;
   bool is_initialized_ = false;

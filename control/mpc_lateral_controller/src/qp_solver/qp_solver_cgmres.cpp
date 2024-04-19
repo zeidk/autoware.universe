@@ -23,20 +23,19 @@ namespace autoware::motion::control::mpc_lateral_controller
 {
 QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger)
 : logger_{logger},
-  cgmres_logger_("../log/trajectory_following"),
-  mpc_(
-    ocp_, cgmres::Horizon(0.1, 0.0),
-    settings_),  // Direct initialization of Horizon in the initializer list.
+  cgmres_logger_("/home/kyoichi-sugahara/.ros/log/cgmres/trajectory_following"),
+  settings_{
+    50,     // max_iter
+    1e-06,  // opterr_tol
+    1e-08,  // finite_difference_epsilon
+    0.03,   // sampling_time
+    33.3,   // zeta
+    1e-03,  // min_dummy
+    0       // verbose_level
+  },
+  mpc_(ocp_, cgmres::Horizon(0.1, 0.0), settings_),
   initializer_(ocp_, settings_)
 {
-  // Solver settings.
-  settings_.sampling_time = 0.03;  // sampling period
-  settings_.zeta = 33.3;
-  settings_.finite_difference_epsilon = 1e-08;
-  // Initialization settings.
-  settings_.max_iter = 50;
-  settings_.opterr_tol = 1e-06;
-  settings_.verbose_level = 0;
 }
 
 bool QPSolverCGMRES::solveCGMRES(
@@ -97,6 +96,7 @@ bool QPSolverCGMRES::solveCGMRES(
 
     // RCLCPP_DEBUG(logger_, " time_from_last_initialized = %e \n", time_from_last_initialized);
     // RCLCPP_DEBUG(logger_, "updated u = %e ",mpc_.uopt()[0].value());
+    cgmres_logger_.save(time_from_last_initialized, x, mpc_.uopt()[0], mpc_.optError());
     // cgmres_logger_.save(
     //   time_from_last_initialized, x, mpc_.uopt()[0], mpc_.uopt(), mpc_.optError(),
     //   mpc_.normDiff(), mpc_.StandardDeviation());
