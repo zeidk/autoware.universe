@@ -96,7 +96,8 @@ bool QPSolverCGMRES::solveCGMRES(
 
     // RCLCPP_DEBUG(logger_, " time_from_last_initialized = %e \n", time_from_last_initialized);
     // RCLCPP_DEBUG(logger_, "updated u = %e ",mpc_.uopt()[0].value());
-    cgmres_logger_.save(time_from_last_initialized, x, mpc_.uopt()[0], mpc_.optError());
+    cgmres_logger_.save(
+      time_from_last_initialized, x, mpc_.uopt()[0], mpc_.uopt(), mpc_.optError());
     // cgmres_logger_.save(
     //   time_from_last_initialized, x, mpc_.uopt()[0], mpc_.uopt(), mpc_.optError(),
     //   mpc_.normDiff(), mpc_.StandardDeviation());
