@@ -62,7 +62,8 @@ public:
    */
   virtual bool solveCGMRES(
     const Eigen::VectorXd & /* x0 */, const MPCTrajectory & /*resampled_ref_trajectory*/,
-    const double /*prediction_dt */, Eigen::VectorXd & /*u*/, const bool /* warm_start */)
+    const double /*prediction_dt */, Eigen::VectorXd & /*u*/, const int /*prediction_horizon*/,
+    const bool /* warm_start */)
   {
     return false;
   }

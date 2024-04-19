@@ -41,9 +41,10 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger)
 
 bool QPSolverCGMRES::solveCGMRES(
   const Eigen::VectorXd & x0, const MPCTrajectory & resampled_ref_trajectory,
-  const double prediction_dt, Eigen::VectorXd & u, const bool warm_start)
+  const double prediction_dt, Eigen::VectorXd & u, const int prediction_horizon,
+  const bool warm_start)
 {
-  std::cerr << "prediction_dt: " << prediction_dt << std::endl;
+  // std::cerr << "prediction_dt: " << prediction_dt << std::endl;
   // // Define the horizon.
   const double alpha = 0.0;
   [[maybe_unused]] cgmres::Horizon horizon(prediction_dt, alpha);
@@ -74,6 +75,13 @@ bool QPSolverCGMRES::solveCGMRES(
   }
 
   if (warm_start) {
+    if (prediction_horizon != decltype(mpc_)::getN()) {
+      RCLCPP_ERROR(
+        logger_,
+        "mpc_prediction_horizon defined by parameter file is not equal to cgmres's prediction "
+        "horizon setting. Please check the parameter file and the setting in QPSolverCGMRES");
+    }
+
     const double time_from_last_initialized =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::system_clock::now() - initialized_time_)

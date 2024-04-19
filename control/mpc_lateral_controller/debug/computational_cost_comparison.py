@@ -24,19 +24,19 @@ def extract_calculation_times(log_file_path):
     cgmres_pattern = (
         r"\[controller\.lateral_controller\]: executeOptimization \(cgmres\) time = (\d+) \[ns\]"
     )
-    generate_mpc_matrix_pattern = (
-        r"\[controller\.lateral_controller\]: generateMPCMatrix time = (\d+) \[ns\]"
-    )
+    # generate_mpc_matrix_pattern = (
+    #     r"\[controller\.lateral_controller\]: generateMPCMatrix time = (\d+) \[ns\]"
+    # )
 
     osqp_times = re.findall(osqp_pattern, log_data)
     cgmres_times = re.findall(cgmres_pattern, log_data)
-    generate_mpc_matrix_times = re.findall(generate_mpc_matrix_pattern, log_data)
+    # generate_mpc_matrix_times = re.findall(generate_mpc_matrix_pattern, log_data)
 
     osqp_times = [int(time) / 1000000 for time in osqp_times]  # Convert nsec to msec
     cgmres_times = [int(time) / 1000000 for time in cgmres_times]  # Convert nsec to msec
-    generate_mpc_matrix_times = [
-        int(time) / 1000000 for time in generate_mpc_matrix_times
-    ]  # Convert nsec to msec
+    # generate_mpc_matrix_times = [
+    #     int(time) / 1000000 for time in generate_mpc_matrix_times
+    # ]  # Convert nsec to msec
 
     return osqp_times, cgmres_times, generate_mpc_matrix_times
 
@@ -45,9 +45,9 @@ def plot_calculation_times(osqp_times, cgmres_times, generate_mpc_matrix_times, 
     plt.figure(figsize=(10, 6))
     plt.plot(range(len(osqp_times)), osqp_times, label="OSQP")
     plt.plot(range(len(cgmres_times)), cgmres_times, label="CGMRES")
-    plt.plot(
-        range(len(generate_mpc_matrix_times)), generate_mpc_matrix_times, label="generateMPCMatrix"
-    )
+    # plt.plot(
+    #     range(len(generate_mpc_matrix_times)), generate_mpc_matrix_times, label="generateMPCMatrix"
+    # )
     plt.xlabel("Iteration")
     plt.ylabel("Calculation Time [ms]")  # Change the unit to msec
     plt.title(f"OSQP vs CGMRES vs generateMPCMatrix Calculation Time\nLog File: {log_file_name}")

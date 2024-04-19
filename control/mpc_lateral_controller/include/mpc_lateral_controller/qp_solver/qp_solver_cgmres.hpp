@@ -60,7 +60,8 @@ public:
     const Eigen::VectorXd & ub_a, Eigen::VectorXd & u) override;
   bool solveCGMRES(
     const Eigen::VectorXd & x0, const MPCTrajectory & resampled_ref_trajectory,
-    double prediction_dt, Eigen::VectorXd & u, const bool warm_start) override;
+    double prediction_dt, Eigen::VectorXd & u, const int prediction_horizon,
+    const bool warm_start) override;
 
   int64_t getTakenIter() const override { return cgmressolver_.getTakenIter(); }
   double getRunTime() const override { return cgmressolver_.getRunTime(); }
