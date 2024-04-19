@@ -21,9 +21,9 @@
 
 namespace autoware::motion::control::mpc_lateral_controller
 {
-QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger)
+QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger, const std::string & log_dir)
 : logger_{logger},
-  cgmres_logger_("/home/kyoichi-sugahara/.ros/log/cgmres/trajectory_following"),
+  cgmres_logger_(log_dir),
   settings_{
     50,     // max_iter
     1e-06,  // opterr_tol

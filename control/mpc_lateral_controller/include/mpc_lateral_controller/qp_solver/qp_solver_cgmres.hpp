@@ -37,7 +37,7 @@ public:
   /**
    * @brief constructor
    */
-  explicit QPSolverCGMRES(const rclcpp::Logger & logger);
+  explicit QPSolverCGMRES(const rclcpp::Logger & logger, const std::string & log_dir);
 
   /**
    * @brief destructor
@@ -72,7 +72,6 @@ public:
 private:
   autoware::common::osqp::OSQPInterface cgmressolver_;
   cgmres::OCP_lateral_control ocp_;
-  std::string log_dir_;
 
   static constexpr int N = 50;         // CGMRESソルバーの予測ステップ数
   static constexpr int kmax = 5;       // CGMRESソルバーの最大反復回数

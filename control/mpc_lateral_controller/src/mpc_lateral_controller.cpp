@@ -26,7 +26,9 @@
 #include "vehicle_info_util/vehicle_info_util.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <deque>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <string>
@@ -214,7 +216,12 @@ std::shared_ptr<QPSolverInterface> MpcLateralController::createQPSolverInterface
   }
 
   if (qp_solver_type_ == "cgmres") {
-    qpsolver_ptr = std::make_shared<QPSolverCGMRES>(logger_);
+    const char * home_dir = getenv("HOME");
+    if (!home_dir) {
+      throw std::runtime_error("Environment variable HOME not set.");
+    }
+    std::filesystem::path log_dir = std::filesystem::path(home_dir) / ".ros" / "log" / "";
+    qpsolver_ptr = std::make_shared<QPSolverCGMRES>(logger_, log_dir);
     return qpsolver_ptr;
   }
 

@@ -38,10 +38,12 @@ def extract_calculation_times(log_file_path):
     #     int(time) / 1000000 for time in generate_mpc_matrix_times
     # ]  # Convert nsec to msec
 
-    return osqp_times, cgmres_times, generate_mpc_matrix_times
+    return osqp_times, cgmres_times
+    # return osqp_times, cgmres_times, generate_mpc_matrix_times
 
 
-def plot_calculation_times(osqp_times, cgmres_times, generate_mpc_matrix_times, log_file_name):
+# def plot_calculation_times(osqp_times, cgmres_times, generate_mpc_matrix_times, log_file_name):
+def plot_calculation_times(osqp_times, cgmres_times, log_file_name):
     plt.figure(figsize=(10, 6))
     plt.plot(range(len(osqp_times)), osqp_times, label="OSQP")
     plt.plot(range(len(cgmres_times)), cgmres_times, label="CGMRES")
@@ -74,5 +76,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("Invalid log path. Please provide a directory or a file path.")
 
-    osqp_times, cgmres_times, generate_mpc_matrix_times = extract_calculation_times(log_file_path)
-    plot_calculation_times(osqp_times, cgmres_times, generate_mpc_matrix_times, log_file_name)
+    osqp_times, cgmres_times = extract_calculation_times(log_file_path)
+    # osqp_times, cgmres_times, generate_mpc_matrix_times = extract_calculation_times(log_file_path)
+    plot_calculation_times(osqp_times, cgmres_times, log_file_name)
+    # plot_calculation_times(osqp_times, cgmres_times, generate_mpc_matrix_times, log_file_name)
