@@ -23,9 +23,16 @@
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -127,14 +134,80 @@ inline void spinWhile(T & node)
   }
 }
 
-void writeTrajectoriesToFiles(
-  const Trajectory & original_ref_trajectory, const Trajectory & resampled_ref_trajectory,
-  const Trajectory & predicted_trajectory,
-  const Trajectory & predicted_trajectory_in_frenet_coordinate,
-  const Trajectory & cgmres_predicted_trajectory_in_frenet_coordinate,
-  const Trajectory & cgmres_predicted_trajectory, const rclcpp::Time & stamp)
+void writeTrajectoryToFile(
+  const Trajectory & trajectory, std::ofstream & output_file_x, std::ofstream & output_file_y)
 {
-  std::ifstream input_file_time("time.log");
+  for (const auto & point : trajectory.points) {
+    output_file_x << point.pose.position.x << ",";
+    output_file_y << point.pose.position.y << ",";
+  }
+  output_file_x << std::endl;
+  output_file_y << std::endl;
+}
+
+void openOutputFilesInWriteMode(
+  const std::string & trajectory_directory, std::ofstream & output_file_orig_x,
+  std::ofstream & output_file_orig_y, std::ofstream & output_file_resampled_x,
+  std::ofstream & output_file_resampled_y, std::ofstream & output_file_predicted_x,
+  std::ofstream & output_file_predicted_y, std::ofstream & output_file_predicted_frenet_x,
+  std::ofstream & output_file_predicted_frenet_y,
+  std::ofstream & output_file_cgmres_predicted_frenet_x,
+  std::ofstream & output_file_cgmres_predicted_frenet_y,
+  std::ofstream & output_file_cgmres_predicted_x, std::ofstream & output_file_cgmres_predicted_y,
+  std::ofstream & output_file_time)
+{
+  output_file_orig_x.open(trajectory_directory + "original_x.log");
+  output_file_orig_y.open(trajectory_directory + "original_y.log");
+  output_file_resampled_x.open(trajectory_directory + "resampled_x.log");
+  output_file_resampled_y.open(trajectory_directory + "resampled_y.log");
+  output_file_predicted_x.open(trajectory_directory + "predicted_x.log");
+  output_file_predicted_y.open(trajectory_directory + "predicted_y.log");
+  output_file_predicted_frenet_x.open(trajectory_directory + "predicted_frenet_x.log");
+  output_file_predicted_frenet_y.open(trajectory_directory + "predicted_frenet_y.log");
+  output_file_cgmres_predicted_frenet_x.open(
+    trajectory_directory + "cgmres_predicted_frenet_x.log");
+  output_file_cgmres_predicted_frenet_y.open(
+    trajectory_directory + "cgmres_predicted_frenet_y.log");
+  output_file_cgmres_predicted_x.open(trajectory_directory + "cgmres_predicted_x.log");
+  output_file_cgmres_predicted_y.open(trajectory_directory + "cgmres_predicted_y.log");
+  output_file_time.open(trajectory_directory + "time.log");
+}
+
+void openOutputFilesInAppendMode(
+  const std::string & trajectory_directory, std::ofstream & output_file_orig_x,
+  std::ofstream & output_file_orig_y, std::ofstream & output_file_resampled_x,
+  std::ofstream & output_file_resampled_y, std::ofstream & output_file_predicted_x,
+  std::ofstream & output_file_predicted_y, std::ofstream & output_file_predicted_frenet_x,
+  std::ofstream & output_file_predicted_frenet_y,
+  std::ofstream & output_file_cgmres_predicted_frenet_x,
+  std::ofstream & output_file_cgmres_predicted_frenet_y,
+  std::ofstream & output_file_cgmres_predicted_x, std::ofstream & output_file_cgmres_predicted_y,
+  std::ofstream & output_file_time)
+{
+  output_file_orig_x.open(trajectory_directory + "original_x.log", std::ios::app);
+  output_file_orig_y.open(trajectory_directory + "original_y.log", std::ios::app);
+  output_file_resampled_x.open(trajectory_directory + "resampled_x.log", std::ios::app);
+  output_file_resampled_y.open(trajectory_directory + "resampled_y.log", std::ios::app);
+  output_file_predicted_x.open(trajectory_directory + "predicted_x.log", std::ios::app);
+  output_file_predicted_y.open(trajectory_directory + "predicted_y.log", std::ios::app);
+  output_file_predicted_frenet_x.open(
+    trajectory_directory + "predicted_frenet_x.log", std::ios::app);
+  output_file_predicted_frenet_y.open(
+    trajectory_directory + "predicted_frenet_y.log", std::ios::app);
+  output_file_cgmres_predicted_frenet_x.open(
+    trajectory_directory + "cgmres_predicted_frenet_x.log", std::ios::app);
+  output_file_cgmres_predicted_frenet_y.open(
+    trajectory_directory + "cgmres_predicted_frenet_y.log", std::ios::app);
+  output_file_cgmres_predicted_x.open(
+    trajectory_directory + "cgmres_predicted_x.log", std::ios::app);
+  output_file_cgmres_predicted_y.open(
+    trajectory_directory + "cgmres_predicted_y.log", std::ios::app);
+  output_file_time.open(trajectory_directory + "time.log", std::ios::app);
+}
+
+std::string getTrajectoryDirectory(const std::string & log_directory)
+{
+  std::ifstream input_file_time(log_directory + "time.log");
   std::string last_line;
   std::string line;
   if (input_file_time.is_open()) {
@@ -145,123 +218,182 @@ void writeTrajectoriesToFiles(
     }
     input_file_time.close();
   }
-  std::cerr << "last_line: " << last_line << std::endl;
+
+  if (!last_line.empty()) {
+    double last_time_in_seconds = std::stod(last_line);
+    std::string trajectory_directory =
+      log_directory + "trajectory_" + std::to_string(last_time_in_seconds) + "/";
+    return trajectory_directory;
+  } else {
+    return "";
+  }
+}
+
+std::string createTrajectoryDirectory(const std::string & log_directory)
+{
+  // Get current process ID
+  pid_t pid = getpid();
+  // Get current timestamp
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  int64_t timestamp = static_cast<int64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
+  // Create directory name
+  std::stringstream ss;
+  ss << "trajectory_" << pid << "_" << timestamp;
+  std::string number_string = ss.str();
+
+  // Create directory
+  std::string trajectory_directory = log_directory + number_string + "/";
+  int ret = mkdir(trajectory_directory.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  if (ret != 0 && errno != EEXIST) {
+    std::cerr << "Error: Failed to create directory " << trajectory_directory << std::endl;
+    return "";
+  }
+
+  return trajectory_directory;
+}
+
+std::string openOutputFiles(
+  const std::string & log_directory, const std::string & latest_directory,
+  std::ofstream & output_file_orig_x, std::ofstream & output_file_orig_y,
+  std::ofstream & output_file_resampled_x, std::ofstream & output_file_resampled_y,
+  std::ofstream & output_file_predicted_x, std::ofstream & output_file_predicted_y,
+  std::ofstream & output_file_predicted_frenet_x, std::ofstream & output_file_predicted_frenet_y,
+  std::ofstream & output_file_cgmres_predicted_frenet_x,
+  std::ofstream & output_file_cgmres_predicted_frenet_y,
+  std::ofstream & output_file_cgmres_predicted_x, std::ofstream & output_file_cgmres_predicted_y,
+  std::ofstream & output_file_time, const rclcpp::Time & stamp)
+{
+  std::string trajectory_directory;
+
+  if (!latest_directory.empty()) {
+    std::string time_log_file = log_directory + latest_directory + "/time.log";
+    std::ifstream input_file_time(time_log_file);
+    std::string last_line;
+    std::string line;
+    if (input_file_time.is_open()) {
+      while (std::getline(input_file_time, line)) {
+        if (!line.empty()) {
+          last_line = line;
+        }
+      }
+      input_file_time.close();
+    }
+
+    if (!last_line.empty()) {
+      double last_time_in_seconds = std::stod(last_line);
+      rclcpp::Time last_stamp(last_time_in_seconds);
+      double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
+
+      if (time_in_seconds - last_time_in_seconds <= 10.0) {
+        trajectory_directory = log_directory + latest_directory + "/";
+        openOutputFilesInAppendMode(
+          trajectory_directory, output_file_orig_x, output_file_orig_y, output_file_resampled_x,
+          output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
+          output_file_predicted_frenet_x, output_file_predicted_frenet_y,
+          output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
+          output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time);
+      } else {
+        trajectory_directory = createTrajectoryDirectory(log_directory);
+        openOutputFilesInWriteMode(
+          trajectory_directory, output_file_orig_x, output_file_orig_y, output_file_resampled_x,
+          output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
+          output_file_predicted_frenet_x, output_file_predicted_frenet_y,
+          output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
+          output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time);
+      }
+    } else {
+      trajectory_directory = createTrajectoryDirectory(log_directory);
+      openOutputFilesInWriteMode(
+        trajectory_directory, output_file_orig_x, output_file_orig_y, output_file_resampled_x,
+        output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
+        output_file_predicted_frenet_x, output_file_predicted_frenet_y,
+        output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
+        output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time);
+    }
+  } else {
+    trajectory_directory = createTrajectoryDirectory(log_directory);
+    openOutputFilesInWriteMode(
+      trajectory_directory, output_file_orig_x, output_file_orig_y, output_file_resampled_x,
+      output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
+      output_file_predicted_frenet_x, output_file_predicted_frenet_y,
+      output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
+      output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time);
+  }
+
+  return trajectory_directory;
+}
+
+std::string getLatestDirectory(const std::string & log_directory)
+{
+  std::string latest_directory;
+  std::time_t latest_time = 0;
+
+  for (const auto & entry : std::filesystem::directory_iterator(log_directory)) {
+    if (entry.is_directory()) {
+      std::string directory_name = entry.path().filename().string();
+      if (directory_name.find("trajectory_") == 0) {
+        std::time_t directory_time = std::stoll(directory_name.substr(11));
+        if (directory_time > latest_time) {
+          latest_time = directory_time;
+          latest_directory = directory_name;
+        }
+      }
+    }
+  }
+
+  return latest_directory;
+}
+
+void writeTrajectoriesToFiles(
+  const Trajectory & original_ref_trajectory, const Trajectory & resampled_ref_trajectory,
+  const Trajectory & predicted_trajectory,
+  const Trajectory & predicted_trajectory_in_frenet_coordinate,
+  const Trajectory & cgmres_predicted_trajectory_in_frenet_coordinate,
+  const Trajectory & cgmres_predicted_trajectory, const rclcpp::Time & stamp)
+{
+  // Get home directory path
+  const char * home_dir = std::getenv("HOME");
+  if (home_dir == nullptr) {
+    std::cerr << "Error: HOME environment variable not set." << std::endl;
+    return;
+  }
+  const std::string log_directory = std::string(home_dir) + "/.ros/log/";
+
+  // Get the latest directory in log_directory
+  std::string latest_directory = getLatestDirectory(log_directory);
+
+  // Open output files
   std::ofstream output_file_orig_x, output_file_orig_y, output_file_resampled_x,
     output_file_resampled_y, output_file_predicted_x, output_file_predicted_y,
     output_file_predicted_frenet_x, output_file_predicted_frenet_y,
     output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
     output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time;
+  std::string trajectory_directory = openOutputFiles(
+    log_directory, latest_directory, output_file_orig_x, output_file_orig_y,
+    output_file_resampled_x, output_file_resampled_y, output_file_predicted_x,
+    output_file_predicted_y, output_file_predicted_frenet_x, output_file_predicted_frenet_y,
+    output_file_cgmres_predicted_frenet_x, output_file_cgmres_predicted_frenet_y,
+    output_file_cgmres_predicted_x, output_file_cgmres_predicted_y, output_file_time, stamp);
 
-  if (!last_line.empty()) {
-    double last_time_in_seconds = std::stod(last_line);
-    rclcpp::Time last_stamp(last_time_in_seconds);
-    double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
-    std::cerr << "last_stamp: " << last_time_in_seconds << std::endl;
-    std::cerr << "stamp: " << time_in_seconds << std::endl;
+  // Write trajectories to files
+  writeTrajectoryToFile(original_ref_trajectory, output_file_orig_x, output_file_orig_y);
+  writeTrajectoryToFile(resampled_ref_trajectory, output_file_resampled_x, output_file_resampled_y);
+  writeTrajectoryToFile(predicted_trajectory, output_file_predicted_x, output_file_predicted_y);
+  writeTrajectoryToFile(
+    predicted_trajectory_in_frenet_coordinate, output_file_predicted_frenet_x,
+    output_file_predicted_frenet_y);
+  writeTrajectoryToFile(
+    cgmres_predicted_trajectory_in_frenet_coordinate, output_file_cgmres_predicted_frenet_x,
+    output_file_cgmres_predicted_frenet_y);
+  writeTrajectoryToFile(
+    cgmres_predicted_trajectory, output_file_cgmres_predicted_x, output_file_cgmres_predicted_y);
 
-    if (time_in_seconds - last_time_in_seconds <= 10.0) {
-      output_file_orig_x.open("original_x.log", std::ios::app);
-      output_file_orig_y.open("original_y.log", std::ios::app);
-      output_file_resampled_x.open("resampled_x.log", std::ios::app);
-      output_file_resampled_y.open("resampled_y.log", std::ios::app);
-      output_file_predicted_x.open("predicted_x.log", std::ios::app);
-      output_file_predicted_y.open("predicted_y.log", std::ios::app);
-      output_file_predicted_frenet_x.open("predicted_frenet_x.log", std::ios::app);
-      output_file_predicted_frenet_y.open("predicted_frenet_y.log", std::ios::app);
-      output_file_cgmres_predicted_frenet_x.open("cgmres_predicted_frenet_x.log", std::ios::app);
-      output_file_cgmres_predicted_frenet_y.open("cgmres_predicted_frenet_y.log", std::ios::app);
-      output_file_cgmres_predicted_x.open("cgmres_predicted_x.log", std::ios::app);
-      output_file_cgmres_predicted_y.open("cgmres_predicted_y.log", std::ios::app);
-      output_file_time.open("time.log", std::ios::app);
-    } else {
-      output_file_orig_x.open("original_x.log");
-      output_file_orig_y.open("original_y.log");
-      output_file_resampled_x.open("resampled_x.log");
-      output_file_resampled_y.open("resampled_y.log");
-      output_file_predicted_x.open("predicted_x.log");
-      output_file_predicted_y.open("predicted_y.log");
-      output_file_predicted_frenet_x.open("predicted_frenet_x.log");
-      output_file_predicted_frenet_y.open("predicted_frenet_y.log");
-      output_file_cgmres_predicted_frenet_x.open("cgmres_predicted_frenet_x.log");
-      output_file_cgmres_predicted_frenet_y.open("cgmres_predicted_frenet_y.log");
-      output_file_cgmres_predicted_x.open("cgmres_predicted_x.log");
-      output_file_cgmres_predicted_y.open("cgmres_predicted_y.log");
-      output_file_time.open("time.log");
-    }
-  } else {
-    output_file_orig_x.open("original_x.log");
-    output_file_orig_y.open("original_y.log");
-    output_file_resampled_x.open("resampled_x.log");
-    output_file_resampled_y.open("resampled_y.log");
-    output_file_predicted_x.open("predicted_x.log");
-    output_file_predicted_y.open("predicted_y.log");
-    output_file_predicted_frenet_x.open("predicted_frenet_x.log");
-    output_file_predicted_frenet_y.open("predicted_frenet_y.log");
-    output_file_cgmres_predicted_frenet_x.open("cgmres_predicted_frenet_x.log");
-    output_file_cgmres_predicted_frenet_y.open("cgmres_predicted_frenet_y.log");
-    output_file_cgmres_predicted_x.open("cgmres_predicted_x.log");
-    output_file_cgmres_predicted_y.open("cgmres_predicted_y.log");
-    output_file_time.open("time.log");
-  }
-
-  auto original_ref_trajectory_it = original_ref_trajectory.points.begin();
-  while (original_ref_trajectory_it != original_ref_trajectory.points.end()) {
-    output_file_orig_x << original_ref_trajectory_it->pose.position.x << ",";
-    output_file_orig_y << original_ref_trajectory_it->pose.position.y << ",";
-    ++original_ref_trajectory_it;
-  }
-  output_file_orig_x << std::endl;
-  output_file_orig_y << std::endl;
-
-  auto ref_it = resampled_ref_trajectory.points.begin();
-  while (ref_it != resampled_ref_trajectory.points.end()) {
-    output_file_resampled_x << ref_it->pose.position.x << ",";
-    output_file_resampled_y << ref_it->pose.position.y << ",";
-    ++ref_it;
-  }
-  output_file_resampled_x << std::endl;
-  output_file_resampled_y << std::endl;
-
-  auto pred_it = predicted_trajectory.points.begin();
-  while (pred_it != predicted_trajectory.points.end()) {
-    output_file_predicted_x << pred_it->pose.position.x << ",";
-    output_file_predicted_y << pred_it->pose.position.y << ",";
-    ++pred_it;
-  }
-  output_file_predicted_x << std::endl;
-  output_file_predicted_y << std::endl;
-
-  auto pred_frenet_it = predicted_trajectory_in_frenet_coordinate.points.begin();
-  while (pred_frenet_it != predicted_trajectory_in_frenet_coordinate.points.end()) {
-    output_file_predicted_frenet_x << pred_frenet_it->pose.position.x << ",";
-    output_file_predicted_frenet_y << pred_frenet_it->pose.position.y << ",";
-    ++pred_frenet_it;
-  }
-  output_file_predicted_frenet_x << std::endl;
-  output_file_predicted_frenet_y << std::endl;
-
-  auto cgmres_pred_frenet_it = cgmres_predicted_trajectory_in_frenet_coordinate.points.begin();
-  while (cgmres_pred_frenet_it != cgmres_predicted_trajectory_in_frenet_coordinate.points.end()) {
-    output_file_cgmres_predicted_frenet_x << cgmres_pred_frenet_it->pose.position.x << ",";
-    output_file_cgmres_predicted_frenet_y << cgmres_pred_frenet_it->pose.position.y << ",";
-    ++cgmres_pred_frenet_it;
-  }
-  output_file_cgmres_predicted_frenet_x << std::endl;
-  output_file_cgmres_predicted_frenet_y << std::endl;
-
-  auto cgmres_pred_it = cgmres_predicted_trajectory.points.begin();
-  while (cgmres_pred_it != cgmres_predicted_trajectory.points.end()) {
-    output_file_cgmres_predicted_x << cgmres_pred_it->pose.position.x << ",";
-    output_file_cgmres_predicted_y << cgmres_pred_it->pose.position.y << ",";
-    ++cgmres_pred_it;
-  }
-  output_file_cgmres_predicted_x << std::endl;
-  output_file_cgmres_predicted_y << std::endl;
-
-  // Calculate time in seconds as a double
+  // Write timestamp to file
   double time_in_seconds = stamp.seconds() + static_cast<double>(stamp.nanoseconds()) / 1e9;
   output_file_time << std::fixed << std::setprecision(3) << time_in_seconds << std::endl;
 }
+
 }  // namespace test_utils
 
 #endif  // TRAJECTORY_FOLLOWER_TEST_UTILS_HPP_
