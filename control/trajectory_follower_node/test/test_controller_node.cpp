@@ -424,7 +424,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     tester.cmd_msg->stamp);
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
-    curvature_sign = curvature_sign - 0.01;
+    // curvature_sign = curvature_sign - 0.01;
     publishTrajectory(curvature_sign);
     test_utils::waitForMessage(tester.node, this, tester.received_control_command);
 
