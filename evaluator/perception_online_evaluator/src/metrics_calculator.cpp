@@ -509,56 +509,6 @@ void MetricsCalculator::setPredictedObjects(
   detection_counter_.addObjects(objects, tf_buffer);
 }
 
-void MetricsCalculator::updateObjectsCountMap(
-  const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer)
-{
-  const auto objects_frame_id = objects.header.frame_id;
-  objects_count_frame_++;
-  DetectionCountMap current_detection_count_map = initializeDetectionCountMap();
-
-  geometry_msgs::msg::TransformStamped transform_stamped;
-  try {
-    transform_stamped = tf_buffer.lookupTransform(
-      "base_link", objects_frame_id, tf2::TimePointZero, tf2::durationFromSec(1.0));
-  } catch (const tf2::TransformException & ex) {
-    std::cerr << "[perception_online_evaluator] Failed to get transform from '" << objects_frame_id
-              << "' to 'base_link': " << ex.what() << std::endl;
-    return;
-  }
-
-  for (const auto & object : objects.objects) {
-    const auto label = object_recognition_utils::getHighestProbLabel(object.classification);
-
-    geometry_msgs::msg::PoseStamped pose_in, pose_out;
-    pose_in.header.frame_id = objects_frame_id;
-    pose_in.pose = object.kinematics.initial_pose_with_covariance.pose;
-
-    // Transform the object's pose into the 'base_link' coordinate frame
-    tf2::doTransform(pose_in, pose_out, transform_stamped);
-
-    const double distance_to_base_link =
-      std::hypot(pose_out.pose.position.x, pose_out.pose.position.y);
-
-    // If the pose is within the detection_radius and below a detection_height, increment the count
-    const bool is_within_detection_radius = distance_to_base_link < parameters_->detection_radius;
-    const bool is_below_detection_height = pose_out.pose.position.z < parameters_->detection_height;
-    if (is_within_detection_radius && is_below_detection_height) {
-      historical_detection_count_map_[label]++;
-      current_detection_count_map[label]++;
-    }
-  }
-
-  detection_count_vector_.emplace_back(current_detection_count_map, current_stamp_);
-
-  auto remove_before =
-    current_stamp_ - rclcpp::Duration::from_seconds(parameters_->objects_count_window_seconds);
-  detection_count_vector_.erase(
-    std::remove_if(
-      detection_count_vector_.begin(), detection_count_vector_.end(),
-      [&](const auto & pair) { return pair.second < remove_before; }),
-    detection_count_vector_.end());
-}
-
 void MetricsCalculator::deleteOldObjects(const rclcpp::Time stamp)
 {
   // delete the data older than 2*time_delay_

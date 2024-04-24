@@ -8,12 +8,7 @@ This module allows for the evaluation of how accurately perception results are g
 
 ## Inner-workings / Algorithms
 
-- Calculates lateral deviation between the predicted path and the actual traveled trajectory.
-- Calculates lateral deviation between the smoothed traveled trajectory and the perceived position to evaluate the stability of lateral position recognition.
-- Calculates yaw deviation between the smoothed traveled trajectory and the perceived position to evaluate the stability of yaw recognition.
-- Calculates yaw rate based on the yaw of the stopped object received in the previous cycle to evaluate the stability of the yaw rate recognition.
-- Counts the number of detections for each object class within the specified detection range.
-  The evaluated metrics are as follows:
+The evaluated metrics are as follows:
 
 - predicted_path_deviation
 - predicted_path_deviation_variance
@@ -197,5 +192,4 @@ It is assumed that the current positions of PredictedObjects are reasonably accu
 - Metrics for objects with strange physical behavior (e.g., going through a fence)
 - Metrics for splitting objects
 - Metrics for problems with objects that are normally stationary but move
-- Metrics for counting the number of objects per class within a specified time frame.
 - Disappearing object metrics
