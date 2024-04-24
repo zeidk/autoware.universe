@@ -15,6 +15,7 @@
 #ifndef PERCEPTION_ONLINE_EVALUATOR__METRICS_CALCULATOR_HPP_
 #define PERCEPTION_ONLINE_EVALUATOR__METRICS_CALCULATOR_HPP_
 
+#include "perception_online_evaluator/metrics/detection_count.hpp"
 #include "perception_online_evaluator/metrics/deviation_metrics.hpp"
 #include "perception_online_evaluator/metrics/metric.hpp"
 #include "perception_online_evaluator/parameters.hpp"
@@ -44,6 +45,7 @@ using autoware_auto_perception_msgs::msg::PredictedObject;
 using autoware_auto_perception_msgs::msg::PredictedObjects;
 using geometry_msgs::msg::Point;
 using geometry_msgs::msg::Pose;
+using metrics::DetectionCounter;
 using unique_identifier_msgs::msg::UUID;
 
 struct ObjectData
@@ -86,7 +88,9 @@ class MetricsCalculator
 {
 public:
   explicit MetricsCalculator(const std::shared_ptr<Parameters> & parameters)
-  : parameters_(parameters){};
+  : parameters_(parameters), detection_counter_(parameters)
+  {
+  }
 
   /**
    * @brief calculate
@@ -98,8 +102,11 @@ public:
   /**
    * @brief set the dynamic objects used to calculate obstacle metrics
    * @param [in] objects predicted objects
+   * @param [in] tf_buffer tf buffer
    */
-  void setPredictedObjects(const PredictedObjects & objects);
+  void setPredictedObjects(const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer);
+
+  void updateObjectsCountMap(const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer);
 
   void updateObjectsCountMap(const PredictedObjects & objects, const tf2_ros::Buffer & tf_buffer);
 
@@ -128,6 +135,8 @@ private:
   std::vector<std::pair<DetectionCountMap, rclcpp::Time>> detection_count_vector_{};
 
   rclcpp::Time current_stamp_;
+
+  DetectionCounter detection_counter_;
 
   // debug
   mutable ObjectDataMap debug_target_object_;
