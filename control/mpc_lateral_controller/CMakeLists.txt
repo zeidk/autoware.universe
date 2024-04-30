@@ -4,6 +4,8 @@ project(mpc_lateral_controller)
 find_package(autoware_cmake REQUIRED)
 autoware_package()
 
+find_package(cgmres REQUIRED)
+
 ament_auto_add_library(steering_offset_lib SHARED
   src/steering_offset/steering_offset.cpp
 )
@@ -24,7 +26,14 @@ ament_auto_add_library(${MPC_LAT_CON_LIB} SHARED
   src/vehicle_model/vehicle_model_bicycle_kinematics.cpp
   src/vehicle_model/vehicle_model_interface.cpp
 )
-target_link_libraries(${MPC_LAT_CON_LIB} steering_offset_lib)
+
+target_link_libraries(${MPC_LAT_CON_LIB} steering_offset_lib
+  ${cgmres_LIBRARIES}
+)
+
+target_include_directories(${MPC_LAT_CON_LIB} PRIVATE
+  ${cgmres_INCLUDE_DIRS}
+)
 
 target_compile_options(${MPC_LAT_CON_LIB} PRIVATE
   -Wno-unused-parameter
