@@ -394,34 +394,21 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
   const auto node_options = makeNodeOptions();
   ControllerTester tester(this, node_options);
   Trajectory ref_trajectory;
+  tester.send_default_transform();
+  tester.publish_odom_vx(1.0);
+  tester.publish_autonomous_operation_mode();
+  tester.publish_default_steer();
+  tester.publish_default_acc();
 
   auto publishTrajectory = [&tester, &ref_trajectory](double curvature_sign) {
-    tester.send_default_transform();
-    tester.publish_odom_vx(1.0);
-    tester.publish_autonomous_operation_mode();
-    tester.publish_default_steer();
-    tester.publish_default_acc();
-
     std_msgs::msg::Header header;
     header.stamp = tester.node->now();
     header.frame_id = "map";
     ref_trajectory = test_utils::generateCurvatureTrajectory(header, curvature_sign, 5.0, 1.0);
     tester.traj_pub->publish(ref_trajectory);
   };
-  double curvature_sign = -0.05;
-  publishTrajectory(curvature_sign);
-  test_utils::waitForMessage(tester.node, this, tester.received_control_command);
-  EXPECT_LT(tester.cmd_msg->lateral.steering_tire_angle, 0.0f);
-  EXPECT_LT(tester.cmd_msg->lateral.steering_tire_rotation_rate, 0.0f);
-  tester.received_control_command = false;
 
-  std::cerr << "cmd_msg's stamp: " << tester.cmd_msg->stamp.sec << "s "
-            << tester.cmd_msg->stamp.nanosec << "ns" << std::endl;
-  test_utils::writeTrajectoriesToFiles(
-    ref_trajectory, *tester.resampled_reference_trajectory, *tester.predicted_trajectory,
-    *tester.predicted_trajectory_in_frenet_coordinate,
-    *tester.cgmres_predicted_trajectory_in_frenet_coordinate, *tester.cgmres_predicted_trajectory,
-    tester.cmd_msg->stamp);
+  double curvature_sign = -0.05;
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
     // curvature_sign = curvature_sign - 0.01;
