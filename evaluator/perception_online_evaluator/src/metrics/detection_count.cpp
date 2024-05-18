@@ -86,6 +86,7 @@ void DetectionCounter::addObjects(
 
       const double distance_to_base_link =
         std::hypot(pose_out.pose.position.x, pose_out.pose.position.y);
+      // const double lateral_distance = std::abs(pose_out.pose.position.y);
 
       // If the pose is within the detection_radius and below a detection_height, increment the
       // count
@@ -93,6 +94,14 @@ void DetectionCounter::addObjects(
       const bool is_below_detection_height = pose_out.pose.position.z < range.height;
       if (is_within_detection_radius && is_below_detection_height) {
         updateDetectionMap(uuid, label, range.toString(), timestamp);
+        // // Check if the object is within 10m ahead and 5m laterally in the base_link frame
+        // if (
+        //   pose_out.pose.position.x > 0.0 && pose_out.pose.position.x < 10.0 &&
+        //   lateral_distance < 5.0 && label == "unknown") {
+        //   std::cerr << "Unknown object detected: uuid=" << uuid
+        //             << ", distance=" << distance_to_base_link
+        //             << ", lateral_distance=" << lateral_distance << std::endl;
+        // }
       }
     }
   }
