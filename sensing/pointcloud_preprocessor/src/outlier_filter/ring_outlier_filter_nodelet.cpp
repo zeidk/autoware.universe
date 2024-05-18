@@ -336,6 +336,21 @@ rcl_interfaces::msg::SetParametersResult RingOutlierFilterComponent::paramCallba
   }
   if (get_param(p, "max_azimuth_diff", max_azimuth_diff_)) {
     RCLCPP_DEBUG(get_logger(), "Setting new max_azimuth_diff to: %f.", max_azimuth_diff_);
+    if (get_param(p, "horizontal_bins", horizontal_bins_)) {
+      RCLCPP_DEBUG(get_logger(), "Setting new horizontal_bins to: %d.", horizontal_bins_);
+    }
+    if (get_param(p, "noise_threshold", noise_threshold_)) {
+      RCLCPP_DEBUG(get_logger(), "Setting new noise_threshold to: %d.", noise_threshold_);
+    }
+    if (get_param(p, "max_azimuth_deg", max_azimuth_deg_)) {
+      RCLCPP_DEBUG(get_logger(), "Setting new max_azimuth_deg to: %f.", max_azimuth_deg_);
+    }
+    if (get_param(p, "min_azimuth_deg", min_azimuth_deg_)) {
+      RCLCPP_DEBUG(get_logger(), "Setting new min_azimuth_deg to: %f.", min_azimuth_deg_);
+    }
+    if (get_param(p, "max_distance", max_distance_)) {
+      RCLCPP_DEBUG(get_logger(), "Setting new max_distance to: %f.", max_distance_);
+    }
   }
 
   rcl_interfaces::msg::SetParametersResult result;
@@ -350,7 +365,8 @@ void RingOutlierFilterComponent::setUpPointCloudFormat(
   size_t num_fields)
 {
   formatted_points.data.resize(points_size);
-  // Note that `input->header.frame_id` is data before converted when `transform_info.need_transform
+  // Note that `input->header.frame_id` is data before converted when
+  // `transform_info.need_transform
   // == true`
   formatted_points.header.frame_id =
     !tf_input_frame_.empty() ? tf_input_frame_ : tf_input_orig_frame_;
