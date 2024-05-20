@@ -65,8 +65,7 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
   node_options.append_parameter_override("lateral_controller_mode", "mpc");
   node_options.append_parameter_override("longitudinal_controller_mode", "pid");
   node_options.append_parameter_override(
-    "enable_keep_stopped_until_steer_convergence",
-    enable_keep_stopped_until_steer_convergence);  // longitudinal
+    "enable_keep_stopped_until_steer_convergence", enable_keep_stopped_until_steer_convergence);
   node_options.arguments(
     {"--ros-args", "--params-file",
      lateral_share_dir + "/param/lateral_controller_cgmres.param.yaml", "--params-file",
@@ -81,59 +80,13 @@ rclcpp::NodeOptions makeNodeOptions(const bool enable_keep_stopped_until_steer_c
 
 std::shared_ptr<Controller> makeNode(const rclcpp::NodeOptions & node_options)
 {
-  std::shared_ptr<Controller> node = std::make_shared<Controller>(node_options);
-
-  // Enable all logging in the node
-  auto ret =
-    rcutils_logging_set_logger_level(node->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
-  if (ret != RCUTILS_RET_OK) {
+  const auto node = std::make_shared<Controller>(node_options);
+  if (
+    rcutils_logging_set_logger_level(node->get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG) !=
+    RCUTILS_RET_OK) {
     std::cout << "Failed to set logging severity to DEBUG\n";
   }
   return node;
-}
-
-template <typename MessageType>
-void save_message_to_rosbag(
-  const std::string & bag_directory, const std::shared_ptr<MessageType> & message,
-  const std::string & topic_name)
-{
-  auto writer = std::make_shared<rosbag2_cpp::writers::SequentialWriter>();
-  rosbag2_storage::StorageOptions storage_options{bag_directory, "sqlite3"};
-  rosbag2_cpp::ConverterOptions converter_options{"cdr", "cdr"};
-  writer->open(storage_options, converter_options);
-
-  rosbag2_storage::TopicMetadata topic_metadata;
-  topic_metadata.name = topic_name;
-  topic_metadata.type = rosidl_generator_traits::data_type<MessageType>();
-  topic_metadata.serialization_format = "cdr";
-  writer->create_topic(topic_metadata);
-
-  rclcpp::SerializedMessage serialized_message;
-  rclcpp::Serialization<MessageType> serializer;
-  serializer.serialize_message(message.get(), &serialized_message);
-
-  auto bag_message = std::make_shared<rosbag2_storage::SerializedBagMessage>();
-  bag_message->serialized_data = std::shared_ptr<rcutils_uint8_array_t>(
-    &serialized_message.get_rcl_serialized_message(), [](rcutils_uint8_array_t * /* unused */) {});
-  bag_message->topic_name = topic_name;
-
-  rcutils_time_point_value_t now;
-  auto ret = rcutils_system_time_now(&now);
-  if (ret != RCUTILS_RET_OK) {
-    std::cerr << "Failed to get current system time: " << rcutils_get_error_string().str
-              << std::endl;
-    return;  // Early return on error
-  }
-  bag_message->time_stamp = now;
-
-  writer->write(bag_message);
-
-  // Function continues after this point if needed.
-  // For instance, you might want to log success, perform cleanup, or other actions.
-  std::cout << "Successfully wrote message to rosbag: " << bag_directory << std::endl;
-
-  // Note: Cleanup and resource deallocation (if necessary) happens automatically
-  // as we are using smart pointers and RAII patterns.
 }
 
 class ControllerTester
@@ -142,6 +95,118 @@ public:
   explicit ControllerTester(FakeNodeFixture * _fnf, const rclcpp::NodeOptions & node_options)
   : fnf(_fnf), node(makeNode(node_options))
   {
+    traj_pub = fnf->create_publisher<Trajectory>("controller/input/reference_trajectory");
+    odom_pub = fnf->create_publisher<VehicleOdometry>("controller/input/current_odometry");
+    steer_pub = fnf->create_publisher<SteeringReport>("controller/input/current_steering");
+    accel_pub = fnf->create_publisher<AccelWithCovarianceStamped>("controller/input/current_accel");
+    operation_mode_pub =
+      fnf->create_publisher<OperationModeState>("controller/input/current_operation_mode");
+
+    cmd_sub = fnf->create_subscription<AckermannControlCommand>(
+      "controller/output/control_cmd", *fnf->get_fake_node(),
+      [this](const AckermannControlCommand::SharedPtr msg) {
+        cmd_msg = msg;
+        received_control_command = true;
+      });
+
+    predicted_traj_in_frenet_sub = fnf->create_subscription<Trajectory>(
+      "controller/debug/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        predicted_trajectory_in_frenet_coordinate = msg;
+        received_predicted_trajectory_in_frenet_coordinate = true;
+      });
+
+    predicted_traj_sub = fnf->create_subscription<Trajectory>(
+      "controller/output/predicted_trajectory", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        predicted_trajectory = msg;
+        received_predicted_trajectory = true;
+      });
+
+    cgmres_predicted_traj_in_frenet_sub = fnf->create_subscription<Trajectory>(
+      "controller/debug/cgmres/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        cgmres_predicted_trajectory_in_frenet_coordinate = msg;
+        received_cgmres_predicted_trajectory_in_frenet_coordinate = true;
+      });
+
+    cgmres_predicted_traj_sub = fnf->create_subscription<Trajectory>(
+      "controller/debug/cgmres/predicted_trajectory", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        cgmres_predicted_trajectory = msg;
+        received_cgmres_predicted_trajectory = true;
+      });
+
+    resampled_ref_traj_sub = fnf->create_subscription<Trajectory>(
+      "controller/debug/resampled_reference_trajectory", *fnf->get_fake_node(),
+      [this](const Trajectory::SharedPtr msg) {
+        resampled_reference_trajectory = msg;
+        received_resampled_reference_trajectory = true;
+      });
+
+    br = std::make_shared<tf2_ros::StaticTransformBroadcaster>(fnf->get_fake_node());
+  }
+
+  void publish_default_odom()
+  {
+    VehicleOdometry odom_msg;
+    odom_msg.header.stamp = node->now();
+    odom_pub->publish(odom_msg);
+  }
+
+  void publish_odom_vx(const double vx)
+  {
+    VehicleOdometry odom_msg;
+    odom_msg.header.stamp = node->now();
+    odom_msg.header.frame_id = "map";
+    odom_msg.twist.twist.linear.x = vx;
+    odom_pub->publish(odom_msg);
+  }
+
+  void publish_default_steer()
+  {
+    SteeringReport steer_msg;
+    steer_msg.stamp = node->now();
+    steer_pub->publish(steer_msg);
+  }
+
+  void publish_steer_angle(const double steer)
+  {
+    SteeringReport steer_msg;
+    steer_msg.stamp = node->now();
+    steer_msg.steering_tire_angle = steer;
+    steer_pub->publish(steer_msg);
+  }
+
+  void publish_default_acc()
+  {
+    AccelWithCovarianceStamped acc_msg;
+    acc_msg.header.stamp = node->now();
+    accel_pub->publish(acc_msg);
+  }
+
+  void publish_autonomous_operation_mode()
+  {
+    OperationModeState msg;
+    msg.stamp = node->now();
+    msg.mode = OperationModeState::AUTONOMOUS;
+    operation_mode_pub->publish(msg);
+  }
+
+  void publish_default_traj()
+  {
+    Trajectory traj_msg;
+    traj_msg.header.stamp = node->now();
+    traj_msg.header.frame_id = "map";
+    traj_pub->publish(traj_msg);
+  }
+
+  void send_default_transform()
+  {
+    geometry_msgs::msg::TransformStamped transform = test_utils::getDummyTransform();
+    transform.header.stamp = node->now();
+    br->sendTransform(transform);
+    test_utils::spinWhile(node);
   }
 
   FakeNodeFixture * fnf;
@@ -161,138 +226,20 @@ public:
   Trajectory::SharedPtr cgmres_predicted_trajectory;
   bool received_cgmres_predicted_trajectory = false;
 
-  void publish_default_odom()
-  {
-    VehicleOdometry odom_msg;
-    odom_msg.header.stamp = node->now();
-    odom_pub->publish(odom_msg);
-  };
+  rclcpp::Publisher<Trajectory>::SharedPtr traj_pub;
+  rclcpp::Publisher<VehicleOdometry>::SharedPtr odom_pub;
+  rclcpp::Publisher<SteeringReport>::SharedPtr steer_pub;
+  rclcpp::Publisher<AccelWithCovarianceStamped>::SharedPtr accel_pub;
+  rclcpp::Publisher<OperationModeState>::SharedPtr operation_mode_pub;
 
-  void publish_odom_vx(const double vx)
-  {
-    VehicleOdometry odom_msg;
-    odom_msg.header.stamp = node->now();
-    odom_msg.header.frame_id = "map";
-    odom_msg.twist.twist.linear.x = vx;
-    // std::cerr << "published odom position: \n x: " << odom_msg.pose.pose.position.x
-    //           << " y: " << odom_msg.pose.pose.position.y
-    //           << " at frame ID: " << odom_msg.header.frame_id << std::endl;
-    odom_pub->publish(odom_msg);
-  };
+  rclcpp::Subscription<AckermannControlCommand>::SharedPtr cmd_sub;
+  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_in_frenet_sub;
+  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_sub;
+  rclcpp::Subscription<Trajectory>::SharedPtr cgmres_predicted_traj_in_frenet_sub;
+  rclcpp::Subscription<Trajectory>::SharedPtr cgmres_predicted_traj_sub;
+  rclcpp::Subscription<Trajectory>::SharedPtr resampled_ref_traj_sub;
 
-  void publish_default_steer()
-  {
-    SteeringReport steer_msg;
-    steer_msg.stamp = node->now();
-    steer_pub->publish(steer_msg);
-  };
-
-  void publish_steer_angle(const double steer)
-  {
-    SteeringReport steer_msg;
-    steer_msg.stamp = node->now();
-    steer_msg.steering_tire_angle = steer;
-    steer_pub->publish(steer_msg);
-  };
-
-  void publish_default_acc()
-  {
-    AccelWithCovarianceStamped acc_msg;
-    acc_msg.header.stamp = node->now();
-    accel_pub->publish(acc_msg);
-  };
-
-  void publish_autonomous_operation_mode()
-  {
-    OperationModeState msg;
-    msg.stamp = node->now();
-    msg.mode = OperationModeState::AUTONOMOUS;
-    operation_mode_pub->publish(msg);
-  };
-
-  void publish_default_traj()
-  {
-    Trajectory traj_msg;
-    traj_msg.header.stamp = node->now();
-    traj_msg.header.frame_id = "map";
-    traj_pub->publish(traj_msg);
-  };
-
-  void send_default_transform()
-  {
-    // Dummy transform: ego is at (0.0, 0.0) in map frame
-    geometry_msgs::msg::TransformStamped transform = test_utils::getDummyTransform();
-    transform.header.stamp = node->now();
-    br->sendTransform(transform);
-
-    // Spin for transform to be published
-    test_utils::spinWhile(node);
-  };
-
-  rclcpp::Publisher<Trajectory>::SharedPtr traj_pub =
-    fnf->create_publisher<Trajectory>("controller/input/reference_trajectory");
-
-  rclcpp::Publisher<VehicleOdometry>::SharedPtr odom_pub =
-    fnf->create_publisher<VehicleOdometry>("controller/input/current_odometry");
-
-  rclcpp::Publisher<SteeringReport>::SharedPtr steer_pub =
-    fnf->create_publisher<SteeringReport>("controller/input/current_steering");
-
-  rclcpp::Publisher<AccelWithCovarianceStamped>::SharedPtr accel_pub =
-    fnf->create_publisher<AccelWithCovarianceStamped>("controller/input/current_accel");
-
-  rclcpp::Publisher<OperationModeState>::SharedPtr operation_mode_pub =
-    fnf->create_publisher<OperationModeState>("controller/input/current_operation_mode");
-
-  rclcpp::Subscription<AckermannControlCommand>::SharedPtr cmd_sub =
-    fnf->create_subscription<AckermannControlCommand>(
-      "controller/output/control_cmd", *fnf->get_fake_node(),
-      [this](const AckermannControlCommand::SharedPtr msg) {
-        cmd_msg = msg;
-        received_control_command = true;
-      });
-
-  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_in_frenet_sub =
-    fnf->create_subscription<Trajectory>(
-      "controller/debug/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
-      [this](const Trajectory::SharedPtr msg) {
-        predicted_trajectory_in_frenet_coordinate = msg;
-        received_predicted_trajectory_in_frenet_coordinate = true;
-      });
-
-  rclcpp::Subscription<Trajectory>::SharedPtr predicted_traj_sub =
-    fnf->create_subscription<Trajectory>(
-      "controller/output/predicted_trajectory", *fnf->get_fake_node(),
-      [this](const Trajectory::SharedPtr msg) {
-        predicted_trajectory = msg;
-        received_predicted_trajectory = true;
-      });
-  rclcpp::Subscription<Trajectory>::SharedPtr cgmres_predicted_traj_in_frenet_sub =
-    fnf->create_subscription<Trajectory>(
-      "controller/debug/cgmres/predicted_trajectory_in_frenet_coordinate", *fnf->get_fake_node(),
-      [this](const Trajectory::SharedPtr msg) {
-        cgmres_predicted_trajectory_in_frenet_coordinate = msg;
-        received_cgmres_predicted_trajectory_in_frenet_coordinate = true;
-      });
-
-  rclcpp::Subscription<Trajectory>::SharedPtr cgmres_predicted_traj_sub =
-    fnf->create_subscription<Trajectory>(
-      "controller/debug/cgmres/predicted_trajectory", *fnf->get_fake_node(),
-      [this](const Trajectory::SharedPtr msg) {
-        cgmres_predicted_trajectory = msg;
-        received_cgmres_predicted_trajectory = true;
-      });
-
-  rclcpp::Subscription<Trajectory>::SharedPtr resampled_ref_traj_sub =
-    fnf->create_subscription<Trajectory>(
-      "controller/debug/resampled_reference_trajectory", *fnf->get_fake_node(),
-      [this](const Trajectory::SharedPtr msg) {
-        resampled_reference_trajectory = msg;
-        received_resampled_reference_trajectory = true;
-      });
-
-  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> br =
-    std::make_shared<tf2_ros::StaticTransformBroadcaster>(fnf->get_fake_node());
+  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> br;
 };
 
 // TEST_F(FakeNodeFixture, no_input)
@@ -408,7 +355,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     tester.traj_pub->publish(ref_trajectory);
   };
 
-  double curvature_sign = -0.05;
+  const double curvature_sign = -0.05;
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
     // curvature_sign = curvature_sign - 0.01;
