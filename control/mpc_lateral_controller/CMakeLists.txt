@@ -44,6 +44,7 @@ if(BUILD_TESTING)
     test/test_mpc.cpp
     test/test_mpc_utils.cpp
     test/test_lowpass_filter.cpp
+    # test/test_cgmres.cpp
   )
   set(TEST_LATERAL_CONTROLLER_EXE test_lateral_controller)
   ament_add_ros_isolated_gtest(${TEST_LATERAL_CONTROLLER_EXE} ${TEST_LAT_SOURCES})
