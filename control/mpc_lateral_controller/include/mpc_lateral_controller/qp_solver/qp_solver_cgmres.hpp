@@ -25,6 +25,7 @@
 #include "osqp_interface/osqp_interface.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#include <memory>
 #include <string>
 
 namespace autoware::motion::control::mpc_lateral_controller
@@ -80,6 +81,7 @@ private:
   rclcpp::Logger logger_;
   cgmres::Logger cgmres_logger_;
   cgmres::SolverSettings settings_;
+  std::shared_ptr<cgmres::OCP_lateral_control::ExternalReference> external_reference_;
   cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax> mpc_;
   cgmres::ZeroHorizonOCPSolver<cgmres::OCP_lateral_control, kmax_init> initializer_;
   bool is_initialized_ = false;

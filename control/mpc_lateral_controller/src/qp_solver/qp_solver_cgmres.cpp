@@ -33,9 +33,12 @@ QPSolverCGMRES::QPSolverCGMRES(const rclcpp::Logger & logger, const std::string 
     1e-03,  // min_dummy
     0       // verbose_level
   },
-  mpc_(ocp_, cgmres::Horizon(0.1, 0.0), settings_),
+  external_reference_(std::make_shared<cgmres::OCP_lateral_control::ExternalReference>()),
   initializer_(ocp_, settings_)
 {
+  ocp_.external_reference = external_reference_;
+  mpc_ = cgmres::SingleShootingCGMRESSolver<cgmres::OCP_lateral_control, N, kmax>(
+    ocp_, cgmres::Horizon(0.1, 0.0), settings_);
 }
 
 bool QPSolverCGMRES::solveCGMRES(
@@ -62,6 +65,7 @@ bool QPSolverCGMRES::solveCGMRES(
   // set the external reference ptr
   ocp_.curvature_in_reference_trajectory = average_curvature;
   ocp_.u_ref[0] = std::atan(average_curvature * ocp_.wheel_base);
+  external_reference_->curvature_in_reference_trajectory = average_curvature;
   std::cerr << "average_curvature: " << average_curvature << std::endl;
   std::cerr << "ocp_.u_ref[0]: " << ocp_.u_ref[0] << std::endl;
   // ocp_.disp(std::cerr);

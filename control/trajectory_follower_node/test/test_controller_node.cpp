@@ -355,7 +355,7 @@ TEST_F(FakeNodeFixture, right_turn_convergence)
     tester.traj_pub->publish(ref_trajectory);
   };
 
-  const double curvature_sign = -0.05;
+  const double curvature_sign = -0.06;
   constexpr size_t iter_num = 10;
   for (size_t i = 0; i < iter_num; i++) {
     // curvature_sign = curvature_sign - 0.01;

@@ -158,13 +158,14 @@ public:
   ///
   void synchronize()
   {
-    // std::cerr << "\n\n\n synchronize is called \n\n\n" << std::endl;
     if (external_reference != nullptr) {
       u_ref[0] = std::atan(external_reference->curvature_in_reference_trajectory * wheel_base);
       curvature_in_reference_trajectory = external_reference->curvature_in_reference_trajectory;
-      std::cerr << "u_ref is updated as: " << u_ref[0] << std::endl;
-      std::cerr << "curvature_in_reference_trajectory is updated as: "
-                << curvature_in_reference_trajectory << std::endl;
+      // std::cerr << "u_ref is updated as: " << u_ref[0] << std::endl;
+      // std::cerr << "curvature_in_reference_trajectory is updated as: "
+      //           << curvature_in_reference_trajectory << std::endl;
+    } else {
+      // std::cerr << "external_reference is nullptr" << std::endl;
     }
   }
 
