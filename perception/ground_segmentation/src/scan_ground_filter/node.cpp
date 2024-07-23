@@ -25,15 +25,15 @@
 
 namespace autoware::ground_segmentation
 {
+using autoware::pointcloud_preprocessor::get_param;
 using autoware::universe_utils::calcDistance3d;
 using autoware::universe_utils::deg2rad;
 using autoware::universe_utils::normalizeDegree;
 using autoware::universe_utils::normalizeRadian;
 using autoware::vehicle_info_utils::VehicleInfoUtils;
-using pointcloud_preprocessor::get_param;
 
 ScanGroundFilterComponent::ScanGroundFilterComponent(const rclcpp::NodeOptions & options)
-: pointcloud_preprocessor::Filter("ScanGroundFilter", options)
+: autoware::pointcloud_preprocessor::Filter("ScanGroundFilter", options)
 {
   // set initial parameters
   {
@@ -96,8 +96,9 @@ inline void ScanGroundFilterComponent::set_field_offsets(const PointCloud2ConstP
   int intensity_index = pcl::getFieldIndex(*input, "intensity");
   if (intensity_index != -1) {
     intensity_offset_ = input->fields[intensity_index].offset;
+    intensity_type_ = input->fields[intensity_index].datatype;
   } else {
-    intensity_offset_ = z_offset_ + sizeof(float);
+    intensity_offset_ = -1;
   }
   offset_initialized_ = true;
 }
@@ -244,7 +245,7 @@ void ScanGroundFilterComponent::initializeFirstGndGrids(
 }
 
 void ScanGroundFilterComponent::checkContinuousGndGrid(
-  PointData & p, pcl::PointXYZ & p_orig_point, const std::vector<GridCenter> & gnd_grids_list)
+  PointData & p, const pcl::PointXYZ & p_orig_point, const std::vector<GridCenter> & gnd_grids_list)
 {
   float next_gnd_z = 0.0f;
   float curr_gnd_slope_ratio = 0.0f;
@@ -286,7 +287,7 @@ void ScanGroundFilterComponent::checkContinuousGndGrid(
 }
 
 void ScanGroundFilterComponent::checkDiscontinuousGndGrid(
-  PointData & p, pcl::PointXYZ & p_orig_point, const std::vector<GridCenter> & gnd_grids_list)
+  PointData & p, const pcl::PointXYZ & p_orig_point, const std::vector<GridCenter> & gnd_grids_list)
 {
   float tmp_delta_max_z = p_orig_point.z - gnd_grids_list.back().max_height;
   float tmp_delta_avg_z = p_orig_point.z - gnd_grids_list.back().avg_height;
@@ -304,7 +305,7 @@ void ScanGroundFilterComponent::checkDiscontinuousGndGrid(
 }
 
 void ScanGroundFilterComponent::checkBreakGndGrid(
-  PointData & p, pcl::PointXYZ & p_orig_point, const std::vector<GridCenter> & gnd_grids_list)
+  PointData & p, const pcl::PointXYZ & p_orig_point, const std::vector<GridCenter> & gnd_grids_list)
 {
   float tmp_delta_avg_z = p_orig_point.z - gnd_grids_list.back().avg_height;
   float tmp_delta_radius = p.radius - gnd_grids_list.back().radius;
@@ -569,6 +570,7 @@ void ScanGroundFilterComponent::extractObjectPoints(
   PointCloud2 & out_object_cloud)
 {
   size_t output_data_size = 0;
+
   for (const auto & i : in_indices.indices) {
     std::memcpy(
       &out_object_cloud.data[output_data_size], &in_cloud_ptr->data[i * in_cloud_ptr->point_step],
@@ -580,7 +582,7 @@ void ScanGroundFilterComponent::extractObjectPoints(
 void ScanGroundFilterComponent::faster_filter(
   const PointCloud2ConstPtr & input, [[maybe_unused]] const IndicesPtr & indices,
   PointCloud2 & output,
-  [[maybe_unused]] const pointcloud_preprocessor::TransformInfo & transform_info)
+  [[maybe_unused]] const autoware::pointcloud_preprocessor::TransformInfo & transform_info)
 {
   std::scoped_lock lock(mutex_);
   stop_watch_ptr_->toc("processing_time", true);
